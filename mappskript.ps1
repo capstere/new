@@ -3964,44 +3964,16 @@ function Document-Archive($DocNrPath,$DocNrName, $DocRev, $agile){
 
 function refresh($objexcel, $wb, $sheet, $revsheet, $agile){
 
-    #Write-Host "Hämtar information..."
-
-    #$username = "Labuser_ipt@cepheid.com"
-    #$password = "Spring2023!!123"
-
-    #$secpass = ConvertTo-SecureString -String $password -AsPlainText -Force
-
-    #[PSCredential]$creds = New-Object System.Management.Automation.PSCredential -ArgumentList $username, $secpass
-
-    #$creds = Import-Clixml -Path "\\SE.CEPHEID.PRI\Cepheid Sweden\QC\QC-1\IPT\Skiftspecifika dokument\Skift 1\Mahdi\powerpoint\AutoMappscript\cred.cred"
-
-    #$secpass = Import-Clixml -Path "\\SE.CEPHEID.PRI\Cepheid Sweden\QC\QC-1\IPT\Skiftspecifika dokument\Skift 1\Mahdi\powerpoint\AutoMappscript\cred.cred"
-
-    #$key = Get-Content "\\SE.CEPHEID.PRI\Cepheid Sweden\QC\QC-1\IPT\Skiftspecifika dokument\Skift 1\Mahdi\powerpoint\AutoMappscript\key.key"
-
-    #[PSCredential]$creds = New-Object System.Management.Automation.PSCredential -ArgumentList $username, ($secpass | ConvertTo-SecureString -Key $key)
-
-    #$thumbprint = "4C711F9531F29BBE90A3531E489AA574A102F29C"
-
     Write-Host "Hämtar körningar"
-
     $clientid = $script:SharePointSettings.ClientId
-
     $tenant = $script:SharePointSettings.Tenant
-
     $certificateprivatekey = $script:SharePointSettings.Certificate
-
     $productionSiteUrl = $script:SharePointSettings.ProductionSiteUrl
-
     Connect-PnPOnline -Url $productionSiteUrl -Tenant $tenant -ClientId $clientid -CertificateBase64Encoded $certificateprivatekey
-
     $list = Get-PnPList -Identity $script:SharePointSettings.ProductionListName
-
     $robalitems = Get-PnPListItem -List $list -PageSize 500
-
     $robal = $robalitems | Where{$_.FieldValues.Work_x0020_Center -like "*ROBAL*" -and $_.FieldValues.Actual_x0020_startdate_x002f__x0 -eq $null `
      -and ($_.FieldValues.Title -match '^\d+$') -and $_.FieldValues.Production_x0020_Day_x002f__x002 -ge ((Get-Date).ToShortDateString())}
-
     $rowarray = @()
 
     foreach($item in $robal){
@@ -4089,45 +4061,28 @@ function refresh($objexcel, $wb, $sheet, $revsheet, $agile){
     'D79377'
     )
 
-    #$reference | %{$_}
-
     Connect-PnPOnline -Url $script:SharePointSettings.DocumentSiteUrl -Tenant $tenant -ClientId $clientid -CertificateBase64Encoded $certificateprivatekey
-
     Write-Host "Hämtar revisioner"
-
     $items = Get-PnPListItem -List "Cepheid" -PageSize 4000
     $items = $items | ?{$_.FileSystemObjectType -eq "Folder"}
-
-    #$items | ?{$_.FieldValues.FileLeafRef -like "*D12547*"}
 
     $sharepointarray = @()
 
     foreach($document in $reference){
 
         $sorthashtable = @{}
-
         $docfolders = $items | ?{$_.FieldValues.FileLeafRef -like "*$document*"}
-
         $docfolders | %{$sorthashtable[$_.FieldValues.FileLeafRef] = $_.FieldValues.Last_x0020_Modified}
-
         $LatestRev = (($sorthashtable.GetEnumerator() | Sort-Object -Property Value -Descending | Select-Object -First 1).Name).split("_")
-
         $date = [string]($sorthashtable.GetEnumerator() | Sort-Object -Property Value -Descending | Select-Object -First 1).Value
-
         $hashtable = [ordered]@{
             "documentname" = ($LatestRev[0]).Replace(" ","") 
-            #"datenr" = $datenr
             "documentrev" = ($LatestRev[1]).Replace(" ","")
             "date" = ($date).Replace(" ","")
         }
-
         $sharepointarray += $hashtable
     }
-
-   #$revarray = $sharepointarray
-
    $revarray = if($agile -eq "Agile"){$revarray}else{$sharepointarray}
-
    return $rowarray, $revarray
 }
 
@@ -4152,8 +4107,6 @@ function totallots($rowarray){
 
 function main($objexcel, $wb, $sheet, $revsheet, $main, $agile, $version, [string]$BatchId, [int]$JobId){
 
-    # [NEW] Automatic mode now processes SharePoint job queue items instead of free-running all lots.
-
     if($main -eq $True){
 
         $result = Invoke-JobQueueProcessing -agile $agile -version $version -BatchId $BatchId -JobId $JobId -objexcel $objexcel -wb $wb -sheet $sheet -revsheet $revsheet
@@ -4173,9 +4126,6 @@ function main($objexcel, $wb, $sheet, $revsheet, $main, $agile, $version, [strin
 function menu($comms, $version, $agile){
 
     $endprogram = $false
-
-    
-
     Do{
 
     $endmanual = 0
@@ -4196,9 +4146,7 @@ function menu($comms, $version, $agile){
 
       3. Exit
     
-"
-        #return $userinput
-    
+" 
         $continue = $true
 
         Do{
@@ -4269,21 +4217,6 @@ function sharepointupdate($docname, $docrev, $date, $agile){
     $fullpath = $sharepointpath + $site + '/'
 
     $username = "Labuser_ipt@cepheid.com"
-    #$password = "Spring2023!!123"
-
-    #$secpass = ConvertTo-SecureString -String $password -AsPlainText -Force
-
-    #$creds = Import-Clixml -Path "\\SE.CEPHEID.PRI\Cepheid Sweden\QC\QC-1\IPT\Skiftspecifika dokument\Skift 1\Mahdi\powerpoint\AutoMappscript\cred.cred"
-
-    #[PSCredential]$creds = New-Object System.Management.Automation.PSCredential -ArgumentList $username, $secpass
-
-    #$secpass = Import-Clixml -Path "\\SE.CEPHEID.PRI\Cepheid Sweden\QC\QC-1\IPT\Skiftspecifika dokument\Skift 1\Mahdi\powerpoint\AutoMappscript\cred.cred"
-
-    #$key = Get-Content "\\SE.CEPHEID.PRI\Cepheid Sweden\QC\QC-1\IPT\Skiftspecifika dokument\Skift 1\Mahdi\powerpoint\AutoMappscript\key.key"
-
-    #[PSCredential]$creds = New-Object System.Management.Automation.PSCredential -ArgumentList $username, ($secpass | ConvertTo-SecureString -Key $key)
-
-    #draft check
 
     $clientid = $script:SharePointSettings.ClientId
 
@@ -4291,12 +4224,7 @@ function sharepointupdate($docname, $docrev, $date, $agile){
 
     $certificateprivatekey = $script:SharePointSettings.Certificate
 
-
-    #$file = "N:\QC\QC-1\IPT\Skiftspecifika dokument\Skift 1\Mahdi\powerpoint\AutoMappscript\dev\draft"
-    
     $downloadrevision = $false
-    #$ignorerev = $false
-
     if(Test-Path -Path "\\SE.CEPHEID.PRI\Cepheid Sweden\QC\QC-1\IPT\Skiftspecifika dokument\Skift 1\Mahdi\powerpoint\AutoMappscript\draft\$($docname)\$($docrev)\$($docrev).txt"){
     
         #checks to see if the script has previously detected a revision change and created a draft for that specific revision.
@@ -4414,13 +4342,9 @@ $status = Get-Content -Path "\\SE.CEPHEID.PRI\Cepheid Sweden\QC\QC-1\IPT\Skiftsp
 
 
 if($status -eq "Disabled"){Write-Host "Automappscript is disabled" -ForegroundColor DarkYellow}else{
-
     $version = "Automatic Mappscript v5.6.4:20250505 "
-
     $env:PNPPOWERSHELL_UPDATECHECK = "Off"
-
     write-host "..."
-
     Write-Host $version
 
     Write-host "..."
@@ -4459,15 +4383,7 @@ if($status -eq "Disabled"){Write-Host "Automappscript is disabled" -ForegroundCo
         "Could not load essential module PnP Powershell for sharepoint interaction. AutoMappscript is disabled,$((($_) -replace ",",";")),$($_.InvocationInfo.ScriptLineNumber),$(((Get-Date -Format "yyyy-MM-dd HH:mm:ss").ToString()))" | Add-Content -Path "\\SE.CEPHEID.PRI\Cepheid Sweden\QC\QC-1\IPT\Skiftspecifika dokument\Skift 1\Mahdi\powerpoint\AutoMappscript\Log\Errorlog.csv"
         }
     }
-    #finally{Write-Host 'Could not load PnP Powershell. Sharepoint feature is disabled.' -BackgroundColor Red; $sharepoint = $false}
 
-    #Set-ExecutionPolicy -Scope "CurrentUser" -ExecutionPolicy "RemoteSigned"
-
-    #install-module pswriteoffice -scope CurrentUser
-
-    #Import-Module PSWriteOffice
-
-    #install-module pswriteword -scope CurrentUser
     try{
         import-module pswriteword -ErrorAction Stop}
     catch{
@@ -4565,4 +4481,5 @@ if($status -eq "Disabled"){Write-Host "Automappscript is disabled" -ForegroundCo
 }
 
 [Environment]::Exit($script:ExitCode)
+
 #v5.6.4:20250505
