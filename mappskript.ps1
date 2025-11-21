@@ -21,6 +21,7 @@ $script:SharePointSettings = @{
 }
 
 $script:JobListConnection = $null
+$script:ExitCode = 0
 
 function Write-AutoLog {
     param(
@@ -3218,6 +3219,7 @@ function running-lotcheck ($rowarray){
     Write-host " "
 }
 
+# [NEW] SharePoint job queue bridge helpers
 # region Job queue helpers
 
 function Get-PendingBatchJobs{
@@ -3225,6 +3227,8 @@ function Get-PendingBatchJobs{
         [int]$JobId,
         [string]$BatchId
     )
+
+    if($BatchId){$BatchId = $BatchId.Trim()}
 
     if(-not $sharepoint){
         return @()
@@ -3260,12 +3264,12 @@ function Get-PendingBatchJobs{
             $fields = $item.FieldValues
             $jobs += [pscustomobject]@{
                 ItemId       = $item.Id
-                BatchId      = if($fields.ContainsKey("BatchId")){$fields["BatchId"]}else{$null}
-                ProductCode  = if($fields.ContainsKey("ProductCode")){$fields["ProductCode"]}else{$null}
-                RobalId      = if($fields.ContainsKey("RobalId")){$fields["RobalId"]}else{$null}
+                BatchId      = if($fields.ContainsKey("BatchId")){($fields["BatchId"]).ToString().Trim()}else{$null}
+                ProductCode  = if($fields.ContainsKey("ProductCode")){($fields["ProductCode"]).ToString().Trim()}else{$null}
+                RobalId      = if($fields.ContainsKey("RobalId")){($fields["RobalId"]).ToString().Trim()}else{$null}
                 Status       = $fields.Status
-                NPath        = if($fields.ContainsKey("NPath")){$fields["NPath"]}else{$null}
-                ErrorMessage = if($fields.ContainsKey("ErrorMessage")){$fields["ErrorMessage"]}else{$null}
+                NPath        = if($fields.ContainsKey("NPath")){($fields["NPath"]).ToString().Trim()}else{$null}
+                ErrorMessage = if($fields.ContainsKey("ErrorMessage")){($fields["ErrorMessage"]).ToString().Trim()}else{$null}
                 Title        = $fields.Title
             }
         }
@@ -3389,7 +3393,11 @@ function Process-RobalItem{
 
 function Get-LotData{
     param(
-        $agile
+        $agile,
+        $objexcel = $null,
+        $wb = $null,
+        $sheet = $null,
+        $revsheet = $null
     )
 
     $errorLogPath = Join-Path -Path $script:LogDirectory -ChildPath 'Errorlog.csv'
@@ -3471,13 +3479,17 @@ function Invoke-JobQueueProcessing{
         $agile,
         $version,
         [string]$BatchId,
-        [int]$JobId
+        [int]$JobId,
+        $objexcel = $null,
+        $wb = $null,
+        $sheet = $null,
+        $revsheet = $null
     )
 
     $logPath = Join-Path -Path $script:LogDirectory -ChildPath 'Log.csv'
     $errorLogPath = Join-Path -Path $script:LogDirectory -ChildPath 'Errorlog.csv'
 
-    $data = Get-LotData -agile $agile
+    $data = Get-LotData -agile $agile -objexcel $objexcel -wb $wb -sheet $sheet -revsheet $revsheet
 
     $jobs = Get-PendingBatchJobs -JobId $JobId -BatchId $BatchId
 
@@ -3523,7 +3535,7 @@ function Invoke-JobQueueProcessing{
             $comment = "Mapp finns redan för batch $($job.BatchId)."
             Write-Host $comment -ForegroundColor DarkYellow
             if($job.ItemId){
-                Set-BatchJobStatus -ItemId $job.ItemId -Status "Done" -NPath $robalitem.npath
+                Set-BatchJobStatus -ItemId $job.ItemId -Status "Done"
             }
             continue
         }
@@ -4138,129 +4150,20 @@ function totallots($rowarray){
 
 }
 
-function main($objexcel, $wb, $sheet, $revsheet, $main, $agile, $version){
+function main($objexcel, $wb, $sheet, $revsheet, $main, $agile, $version, [string]$BatchId, [int]$JobId){
 
-    try{
-
-        try{
-
-            $rowarray, $revarray = refresh -objexcel $objexcel -wb $wb -sheet $sheet -revsheet $revsheet -agile $agile
-
-        }catch{
-        
-            $rowarray, $revarray = refresh -objexcel $objexcel -wb $wb -sheet $sheet -revsheet $revsheet -agile $agile
-
-
-        }
-        
-    }catch{
-        
-        Write-Host "An error has occured at function refresh at line: ($($_.InvocationInfo.ScriptLineNumber)): " $_ -BackgroundColor DarkRed
-                          "An error has occured at function refresh,$((($_) -replace ",",";")),$($_.InvocationInfo.ScriptLineNumber),$(((Get-Date -Format "yyyy-MM-dd HH:mm:ss").ToString()))" | Add-Content -Path "\\SE.CEPHEID.PRI\Cepheid Sweden\QC\QC-1\IPT\Skiftspecifika dokument\Skift 1\Mahdi\powerpoint\AutoMappscript\Log\Errorlog.csv"
-                          
-    }
-
-    if($agile -eq "Agile"){
-        try{
-
-            if((Receive-Job 'MailCheck') -gt 0){import -revarray $revarray}
-            }catch{Write-Host "An error has occured at function import at line: ($($_.InvocationInfo.ScriptLineNumber)): " $_ -BackgroundColor DarkRed
-                              "An error has occured at function import,$((($_) -replace ",",";")),$($_.InvocationInfo.ScriptLineNumber),$(((Get-Date -Format "yyyy-MM-dd HH:mm:ss").ToString()))" | Add-Content -Path "\\SE.CEPHEID.PRI\Cepheid Sweden\QC\QC-1\IPT\Skiftspecifika dokument\Skift 1\Mahdi\powerpoint\AutoMappscript\Log\Errorlog.csv"}
-    }
-    try{
-
-        $rowarray, $revlist = get-folderrev -rowarray $rowarray
-        }catch{Write-Host "An error has occured at function get-folderrev at line: ($($_.InvocationInfo.ScriptLineNumber)): " $_ -BackgroundColor DarkRed
-                          "An error has occured at function get-folderrev,$((($_) -replace ",",";")),$($_.InvocationInfo.ScriptLineNumber),$(((Get-Date -Format "yyyy-MM-dd HH:mm:ss").ToString()))" | Add-Content -Path "\\SE.CEPHEID.PRI\Cepheid Sweden\QC\QC-1\IPT\Skiftspecifika dokument\Skift 1\Mahdi\powerpoint\AutoMappscript\Log\Errorlog.csv"}
-    try{
-
-        $revcheck = sortcheck-revision -rowarray $rowarray -revarray $revarray -agile $agile -revlist $revlist
-        }catch{Write-Host "An error has occured at function sortcheck-revision at line: ($($_.InvocationInfo.ScriptLineNumber)): " $_ -BackgroundColor DarkRed
-                          "An error has occured at function sortcheck-revision,$((($_) -replace ",",";")),$($_.InvocationInfo.ScriptLineNumber),$(((Get-Date -Format "yyyy-MM-dd HH:mm:ss").ToString()))" | Add-Content -Path "\\SE.CEPHEID.PRI\Cepheid Sweden\QC\QC-1\IPT\Skiftspecifika dokument\Skift 1\Mahdi\powerpoint\AutoMappscript\Log\Errorlog.csv"}
-
-    try{
-
-        $rowarray = running-lotcheck -rowarray $revcheck
-        }catch{Write-Host "An error has occured at function running-lotcheck at line: ($($_.InvocationInfo.ScriptLineNumber)): " $_ -BackgroundColor DarkRed
-                          "An error has occured at function running-lotcheck,$((($_) -replace ",",";")),$($_.InvocationInfo.ScriptLineNumber),$(((Get-Date -Format "yyyy-MM-dd HH:mm:ss").ToString()))" | Add-Content -Path "\\SE.CEPHEID.PRI\Cepheid Sweden\QC\QC-1\IPT\Skiftspecifika dokument\Skift 1\Mahdi\powerpoint\AutoMappscript\Log\Errorlog.csv"}
-
-    try{
-
-        $lotsleft = totallots -rowarray $rowarray
-        }catch{Write-Host "An error has occured at function lotsleft at line: ($($_.InvocationInfo.ScriptLineNumber)): " $_ -BackgroundColor DarkRed
-                          "An error has occured at function lotsleft,$((($_) -replace ",",";")),$($_.InvocationInfo.ScriptLineNumber),$(((Get-Date -Format "yyyy-MM-dd HH:mm:ss").ToString()))" | Add-Content -Path "\\SE.CEPHEID.PRI\Cepheid Sweden\QC\QC-1\IPT\Skiftspecifika dokument\Skift 1\Mahdi\powerpoint\AutoMappscript\Log\Errorlog.csv"}
-
-    #$producttable = Import-Clixml -Path "\\SE.CEPHEID.PRI\Cepheid Sweden\QC\QC-1\IPT\Skiftspecifika dokument\Skift 1\Mahdi\powerpoint\AutoMappscript\dev\producttable.xml"
+    # [NEW] Automatic mode now processes SharePoint job queue items instead of free-running all lots.
 
     if($main -eq $True){
 
-        if($lotsleft.count -eq 0){
-            
-            write-host "No lots remaining to be created, exiting"
-            "No lots remaining to be created exiting,$(((Get-Date -Format "yyyy-MM-dd HH:mm:ss").ToString()))" | Add-Content -Path "\\SE.CEPHEID.PRI\Cepheid Sweden\QC\QC-1\IPT\Skiftspecifika dokument\Skift 1\Mahdi\powerpoint\AutoMappscript\Log\Log.csv"
+        $result = Invoke-JobQueueProcessing -agile $agile -version $version -BatchId $BatchId -JobId $JobId -objexcel $objexcel -wb $wb -sheet $sheet -revsheet $revsheet
 
-        }else{
+        return $result
 
-            foreach($robalitem in $lotsleft){
-
-                $returnmat =  get-matvariables $robalitem.material
-
-                if($returnmat.assay -eq 0){
-                    
-                    if($robalitem.mapcreated -ne "Yes"){
-                        write-host "Produkt finns ej i mappscript"
-
-                        "Produkt finns ej i mappscript för $($robalitem.material),$(((Get-Date -Format "yyyy-MM-dd HH:mm:ss").ToString()))" | Add-Content -Path "\\SE.CEPHEID.PRI\Cepheid Sweden\QC\QC-1\IPT\Skiftspecifika dokument\Skift 1\Mahdi\powerpoint\AutoMappscript\Log\Log.csv"
-
-                        $robalitem.mapcreated = "Yes"
-
-                       #TODO: Logg skrivning KLART
-                       #TODO: Filtrera bort alla material som kan ej skapas mapp KLART
-
-                        Continue
-                    }
-                }
-
-            write-host ''
-            Write-Host "ROBAL"$robalitem.robalnr 'LSP:' $robalitem.lsp 'Material:' $robalitem.material 'Batch(s):' $robalitem.batchnr 'Ordernr:' $robalitem.ordernr 'Sample Reagent:' $robalitem.samplereagent 'Order Amount:' $robalitem.orderamount 'Production time:' $robalitem.prodtime 'Rev: '-NoNewline; Write-Host $robalitem.productrev -ForegroundColor Magenta
-
-
-            try{
-                if($robalitem.mapcreated -ne "Yes"){
-
-                    #if(!($producttable[$robalitem.material])){
-
-                     #   Write-Host "Product" $robalitem.material "is disabled"
-
-                    #}else{
-                    
-                        create-folder $returnmat $robalitem.robalnr $robalitem.ordernr $robalitem.batchnr $robalitem.lsp $robalitem.samplereagent $robalitem.prodtime -version $version -robalitem $robalitem
-                        "$(((Get-Date -Format "yyyy-MM-dd HH:mm:ss").ToString())),$($robalitem.robalnr),$($robalitem.lsp),$($robalitem.material),$(($robalitem.batchnr) -replace ',','/'),$($robalitem.ordernr),$(($robalitem.samplereagent) -replace ",","/"),$(($robalitem.orderamount -replace ',','')),$($robalitem.prodtime),$($robalitem.productrev)" | Add-Content -Path "\\SE.CEPHEID.PRI\Cepheid Sweden\QC\QC-1\IPT\Skiftspecifika dokument\Skift 1\Mahdi\powerpoint\AutoMappscript\Log\Folderlog.csv"
-                        $robalitem.mapcreated = "Yes"                    
-                    
-                    #}
-
-
-                }
-            }catch{
-
-                    Write-Host "An error has occured at function create-folder while trying to build folder for $($robalitem.material) at line: $($_.Exception.InvocationInfo.ScriptLineNumber): " $_ -BackgroundColor DarkRed
-
-                    "An error has occured at function create-folder while trying to build folder for $($robalitem.material),$((($_) -replace ",",";")),$($_.InvocationInfo.ScriptLineNumber),$(((Get-Date -Format "yyyy-MM-dd HH:mm:ss").ToString()))" | Add-Content -Path "\\SE.CEPHEID.PRI\Cepheid Sweden\QC\QC-1\IPT\Skiftspecifika dokument\Skift 1\Mahdi\powerpoint\AutoMappscript\Log\Errorlog.csv"
-
-
-                }
-
-            #Start-Sleep 30
-            #"$(((Get-Date -Format "yyy-MM-dd HH:mm").ToString())),$($robalitem.robalnr),$($robalitem.lsp),$($robalitem.material),$(($robalitem.batchnr) -replace ',','.'),$($robalitem.ordernr),$($robalitem.samplereagent),$(($robalitem.orderamount -replace ',','')),$($robalitem.prodtime),$($robalitem.productrev)" | Add-Content -Path .\Log\Folderlog.csv
-
-            #$robalitem.mapcreated = "Yes"
-
-            }
-        }
     }else{
     
-       $endmanual =  manualinput -rowarray $rowarray
+       $data =  Get-LotData -agile $agile -objexcel $objexcel -wb $wb -sheet $sheet -revsheet $revsheet
+       $endmanual =  manualinput -rowarray $data.RowArray
 
        return $endmanual
 
@@ -4306,7 +4209,7 @@ function menu($comms, $version, $agile){
 
                     $main = $True
 
-                    main -objexcel $objexcel -wb $wb -sheet $sheet -revsheet $revsheet -main $main -agile $agile -version $version
+                    main -objexcel $objexcel -wb $wb -sheet $sheet -revsheet $revsheet -main $main -agile $agile -version $version -BatchId $BatchId -JobId $JobId
 
                    
                  }
@@ -4314,7 +4217,7 @@ function menu($comms, $version, $agile){
                 2{
                     $main = $False
 
-                    $endmanual = main -objexcel $objexcel -wb $wb -sheet $sheet -revsheet $revsheet -main $main -agile $agile -version $version
+                    $endmanual = main -objexcel $objexcel -wb $wb -sheet $sheet -revsheet $revsheet -main $main -agile $agile -version $version -BatchId $BatchId -JobId $JobId
 
                 }
                 
@@ -4552,7 +4455,7 @@ if($status -eq "Disabled"){Write-Host "Automappscript is disabled" -ForegroundCo
         Write-Host 'Could not load necessary module PnP Powershell for Sharepoint interaction. Module could be uninstalled from local modules path. Retrying with local path..' -ForegroundColor DarkYellow
         try{Import-Module -Name '.\Modules\PnP.PowerShell' -ErrorAction Stop; $sharepoint = $true}
         catch{
-        Write-Host 'Could not load essential module PnP Powershell for sharepoint interaction. Sharepoint is disabled' -BackgroundColor DarkRed; $sharepoint = $false; $pnp = $false
+        Write-Host 'Could not load essential module PnP Powershell for sharepoint interaction. Sharepoint is disabled' -BackgroundColor DarkRed; $sharepoint = $false; $pnp = $false; $script:ExitCode = 1
         "Could not load essential module PnP Powershell for sharepoint interaction. AutoMappscript is disabled,$((($_) -replace ",",";")),$($_.InvocationInfo.ScriptLineNumber),$(((Get-Date -Format "yyyy-MM-dd HH:mm:ss").ToString()))" | Add-Content -Path "\\SE.CEPHEID.PRI\Cepheid Sweden\QC\QC-1\IPT\Skiftspecifika dokument\Skift 1\Mahdi\powerpoint\AutoMappscript\Log\Errorlog.csv"
         }
     }
@@ -4597,6 +4500,7 @@ if($status -eq "Disabled"){Write-Host "Automappscript is disabled" -ForegroundCo
         Write-Host "Could not load necessary libraries EPPlus 6.2.7, EPPlus Interfaces 6.1.1 and EPPlus System Drawing 6.1.1 required for folder creation. Check if its in in the Modules folder and restart the script. Exiting script..." -BackgroundColor DarkRed
         "Could not load necessary libraries EPPlus 6.2.7; EPPlus Interfaces 6.1.1 and EPPlus System Drawing 6.1.1 required for folder creation, Error Loading EPPlus, 3599,$(((Get-Date -Format "yyyy-MM-dd HH:mm:ss").ToString()))" | Add-Content -Path "\\SE.CEPHEID.PRI\Cepheid Sweden\QC\QC-1\IPT\Skiftspecifika dokument\Skift 1\Mahdi\powerpoint\AutoMappscript\Log\Errorlog.csv"
         $epplus = $false
+        $script:ExitCode = 1
 
     }
 
@@ -4642,18 +4546,23 @@ if($status -eq "Disabled"){Write-Host "Automappscript is disabled" -ForegroundCo
 
         $main = $True
 
-        main -objexcel $objexcel -wb $wb -sheet $sheet -revsheet $revsheet -main $main -agile $agile -version $version
+        $runResult = main -objexcel $objexcel -wb $wb -sheet $sheet -revsheet $revsheet -main $main -agile $agile -version $version -BatchId $BatchId -JobId $JobId
+
+        if(($runResult -is [hashtable]) -and ($runResult.ContainsKey('Success'))){
+            if(-not $runResult.Success){$script:ExitCode = 1}
+        }elseif($runResult -is [int]){
+            $script:ExitCode = $runResult
+        }
 
 
         Start-Sleep 0.5
 
         #[System.Runtime.Interopservices.Marshal]::ReleaseComObject($objexcel) | Out-Null
 
+    }else{
+        if(-not $script:ExitCode){$script:ExitCode = 1}
     }
 }
 
-Start-Sleep 10
-
-stop-process -Id $PID
-
+[Environment]::Exit($script:ExitCode)
 #v5.6.4:20250505
