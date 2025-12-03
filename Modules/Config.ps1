@@ -12,15 +12,15 @@ $RootPaths = @(
 )
 
 $ikonSokvag = Join-Path $ScriptRoot "icon.png"
-$UtrustningListPath = "N:\QC\QC-1\IPT\Skiftspecifika dokument\PQC analyst\JESPER\Scripts\Click Less Project v2\Utrustninglista5.0.xlsx"
+$UtrustningListPath = "N:\QC\QC-1\IPT\Skiftspecifika dokument\PQC analyst\JESPER\Scripts\Click Less Project\Utrustninglista5.0.xlsx"
 $RawDataPath        = "N:\QC\QC-1\IPT\KONTROLLPROVSFIL - Version 2.4.xlsm"
-$SlangAssayPath     = "N:\QC\QC-1\IPT\Skiftspecifika dokument\PQC analyst\JESPER\Scripts\Click Less Project\Click Less Project v2\slangassay.xlsx"
+$SlangAssayPath     = "N:\QC\QC-1\IPT\Skiftspecifika dokument\PQC analyst\JESPER\Scripts\Click Less Project\Click Less Project\slangassay.xlsx"
 
 $OtherScriptPath = ''
 
 $Script1Path  = 'N:\QC\QC-1\IPT\Skiftspecifika dokument\PQC analyst\JESPER\Kontrollprovsfil 2025\Script Raw Data\Kontrollprovsfil_EPPlus_2025.ps1'
-$Script2Path  = 'N:\QC\QC-1\IPT\Skiftspecifika dokument\PQC analyst\JESPER\Scripts\Click Less Project v2\rename-GUI.bat'
-$Script3Path  = 'N:\QC\QC-1\IPT\Skiftspecifika dokument\PQC analyst\JESPER\Scripts\Click Less Project v2\rename-GUI.bat'
+$Script2Path  = 'N:\QC\QC-1\IPT\Skiftspecifika dokument\PQC analyst\JESPER\Scripts\Click Less Project\rename-GUI.bat'
+$Script3Path  = 'N:\QC\QC-1\IPT\Skiftspecifika dokument\PQC analyst\JESPER\Scripts\Click Less Project\rename-GUI.bat'
 
 $env:PNPPOWERSHELL_UPDATECHECK = "Off"
 $global:SP_ClientId   = "INSERT MYSELF"
@@ -59,28 +59,6 @@ $script:GXINF_Map = @{
 
 $SharePointBatchLinkTemplate = 'https://danaher.sharepoint.com/sites/CEP-Sweden-Production-Management/Lists/Cepheid%20%20Production%20orders/ROBAL.aspx?viewid=6c9e53c9-a377-40c1-a154-13a13866b52b&view=7&q={BatchNumber}'
 
-# --------------------------------------------------------------------------
-# Kontrollmaterial-karta och rapportinställningar
-# --------------------------------------------------------------------------
-# Standardväg till kontrollmaterial-kartan (Excel-fil). Justera vid behov
-$Global:ControlMaterialMapPath = Join-Path $ScriptRoot 'ControlMaterialMap_SE.xlsx'
-
-# Rapportinställningar (toggles) som styr vilka sektioner som skrivs ut samt om
-# detaljer för kontrollmaterial ska visas. Dessa kan ändras av användaren eller
-# konfigureras här. Alla värden är booleans.
-$Global:ReportOptions = [ordered]@{
-    # Inkludera listning av saknade replikat (sektion D)
-    IncludeMissingReplicates    = $true
-    # Inkludera dubbletter (sektion F)
-    IncludeDuplicates           = $true
-    # Inkludera instrumentfel (sektion G)
-    IncludeInstrumentErrors     = $true
-    # Inkludera detaljerad information för kontrollmaterial (namn, kategori, källa)
-    IncludeControlDetails       = $true
-    # När sant, visas endast rader i kontrollmaterialssektionen som avviker
-    HighlightMismatchesOnly     = $false
-}
-
 $DevLogDir = Join-Path $ScriptRoot 'Loggar'
 if (-not (Test-Path $DevLogDir)) { New-Item -ItemType Directory -Path $DevLogDir -Force | Out-Null }
 $global:LogPath = Join-Path $DevLogDir ("$($env:USERNAME)_$(Get-Date -Format 'yyyyMMdd_HHmmss').txt")
@@ -91,6 +69,7 @@ function Test-Config {
         Errors   = New-Object System.Collections.Generic.List[object]
         Warnings = New-Object System.Collections.Generic.List[object]
     }
+
     try {
         $templatePath = Join-Path $ScriptRoot 'output_template-v4.xlsx'
         if (-not (Test-Path -LiteralPath $templatePath)) {
@@ -106,7 +85,9 @@ function Test-Config {
     } catch {
         $null = $result.Warnings.Add("Test-Config (utrustning): $($_.Exception.Message)")
     }
+
     try {
+
         if (-not (Test-Path -LiteralPath $RawDataPath)) {
             $null = $result.Warnings.Add("Kontrollprovsfil saknas: $RawDataPath")
         }
@@ -119,13 +100,6 @@ function Test-Config {
         }
     } catch {
         $null = $result.Warnings.Add("Test-Config (slang/assay): $($_.Exception.Message)")
-    }
-    try {
-        if (-not (Test-Path -LiteralPath $Global:ControlMaterialMapPath)) {
-            $null = $result.Warnings.Add("Kontrollmaterial-karta saknas: $Global:ControlMaterialMapPath")
-        }
-    } catch {
-        $null = $result.Warnings.Add("Test-Config (control map): $($_.Exception.Message)")
     }
     try {
         if (-not (Test-Path -LiteralPath $DevLogDir)) {
