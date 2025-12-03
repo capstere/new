@@ -594,7 +594,7 @@ if (-not (Get-Command Get-WorksheetHeaderPerSheet -ErrorAction SilentlyContinue)
             return @{ Has = [bool]$has; Val = $val }
         }
 
-        function Try-FromCells([Object]$ws, [string]$rxLabel, [int]$maxR=1000, [int]$maxC=200, [string]$canon='') {
+        function Try-FromCells([Object]$ws, [string]$rxLabel, [int]$maxR=30, [int]$maxC=20, [string]$canon='') {
             $has=$false; $val=$null
             for($r=1;$r -le $maxR;$r++){
                 for($c=1;$c -le $maxC;$c++){
@@ -636,12 +636,12 @@ foreach ($ws in $Pkg.Workbook.Worksheets) {
             $r4 = Try-FromHeaderFooter $lr 'Doc';       $docLabel=$docLabel -or $r4.Has; if($r4.Val){$doc=$r4.Val}
             $r5 = Try-FromHeaderFooter $lr 'REV';       $revLabel=$revLabel -or $r5.Has; if($r5.Val){$rev=$r5.Val}
             $r6 = Try-FromHeaderFooter $lr 'EFF';       $effLabel=$effLabel -or $r6.Has; if($r6.Val){$eff=$r6.Val}
-            if(-not $part){  $c=Try-FromCells $ws $rxPart      1000 200 'Part';      $partLabel=$partLabel -or $c.Has; if($c.Val){$part=$c.Val} }
-            if(-not $batch){ $c=Try-FromCells $ws $rxBatch     1000 200 'Batch';     $batchLabel=$batchLabel -or $c.Has; if($c.Val){$batch=$c.Val} }
-            if(-not $cart){  $c=Try-FromCells $ws $rxCartridge 1000 200 'Cartridge'; $cartLabel=$cartLabel -or $c.Has; if($c.Val){$cart=$c.Val} }
-            if(-not $doc){   $c=Try-FromCells $ws $rxDoc       1000 200;             $docLabel=$docLabel -or $c.Has; if($c.Val){$doc=$c.Val} }
-            if(-not $rev){   $c=Try-FromCells $ws $rxRev       1000 200;             $revLabel=$revLabel -or $c.Has; if($c.Val){$rev=$c.Val} }
-            if(-not $eff){   $c=Try-FromCells $ws $rxEff       1000 200 'EFF';       $effLabel=$effLabel -or $c.Has; if($c.Val){$eff=$c.Val} }
+            if(-not $part){  $c=Try-FromCells $ws $rxPart      30 20 'Part';      $partLabel=$partLabel -or $c.Has; if($c.Val){$part=$c.Val} }
+            if(-not $batch){ $c=Try-FromCells $ws $rxBatch     30 20 'Batch';     $batchLabel=$batchLabel -or $c.Has; if($c.Val){$batch=$c.Val} }
+            if(-not $cart){  $c=Try-FromCells $ws $rxCartridge 30 20 'Cartridge'; $cartLabel=$cartLabel -or $c.Has; if($c.Val){$cart=$c.Val} }
+            if(-not $doc){   $c=Try-FromCells $ws $rxDoc       30 20;             $docLabel=$docLabel -or $c.Has; if($c.Val){$doc=$c.Val} }
+            if(-not $rev){   $c=Try-FromCells $ws $rxRev       30 20;             $revLabel=$revLabel -or $c.Has; if($c.Val){$rev=$c.Val} }
+            if(-not $eff){   $c=Try-FromCells $ws $rxEff       30 20 'EFF';       $effLabel=$effLabel -or $c.Has; if($c.Val){$eff=$c.Val} }
             $rows += [pscustomobject]@{
                 Sheet              = $ws.Name
                 PartNo             = $part
@@ -739,7 +739,7 @@ function Get-TestSummaryEquipmentFromWorksheet {
     $pipettes = @()
 
     # Regex för pipett-ID: "Nr. 1", "nr 7", "no 26", "nr.3" etc.
-    $pipetteIdRegex = '(?i)^\s*(?:nr|no)\.?\s*\d+\s*$'
+    $pipetteIdRegex = '(?i)\b(?:nr|no)\.?\s*\d+\b'
 
     foreach ($pair in $pipPairs) {
         for ($c = 2; $c -le $maxC; $c += 2) {
@@ -769,20 +769,8 @@ function Get-TestSummaryEquipmentFromWorksheet {
                 if ($txt) { $dueOut = $txt }
             }
 
-            # Normalize pipette ID to "Nr. <number>"
-            $idNorm = $idTxt
-            try {
-                $mId = [regex]::Match($idTxt, '(?i)^\s*(?:nr|no)\.?\s*(\d+)\s*$')
-                if ($mId.Success) {
-                    $idNorm = "Nr. {0}" -f $mId.Groups[1].Value
-                } elseif ($idNorm) {
-                    $idNorm = $idNorm.Trim()
-                }
-            } catch {
-                $idNorm = $idTxt
-            }
             $pipettes += [pscustomobject]@{
-                Id                 = $idNorm
+                Id                 = $idTxt
                 CalibrationDueDate = $dueOut
             }
         }
@@ -849,8 +837,8 @@ function Get-TestSummaryEquipmentFromWorksheet {
             if (-not $idTxt) { continue }
             if ($idTxt -match '^(?i)N/?A$') { continue }
 
-            # Bara GX/Infinity (inklusive romerska siffror t.ex. Infinity-VI)
-            if ($idTxt -notmatch '(?i)^\s*(?:infinity(?:[-\s]*[ivxlcdm]+)?|gx\s*\d+|gx\d+)') {
+            # Bara GX/Infinity
+            if ($idTxt -notmatch '(?i)^(infinity|gx\s*\d+|gx\d+)') {
                 continue
             }
 
@@ -976,6 +964,8 @@ function _canon([string]$raw, [string]$type) {
             @{K='Effective';      T='EFF';       Required=$false; Label='HasEffectiveLabel' }
         )
 
+ 
+
         foreach ($entry in $keys) {
             $k=$entry.K; $t=$entry.T; $req=$entry.Required; $labelProp=$entry.Label
             $vals = foreach($r in $Rows){
@@ -996,52 +986,95 @@ function _canon([string]$raw, [string]$type) {
             }
 
             if($deviants.Count -gt 0){
+
                 $devIssues++
+
                 $majShow = if($major){"'$major'"}else{'(empty)'}
+
                 $line = "- $k majoritet=$majShow | avvikande flikar: " + ($deviants -join ', ')
+
                 [void]$detailsLst.Add($line)
+
             }
+
+ 
 
             if($req){
+
                 $missingSheets = $vals | Where-Object { $_.HasLbl -and -not $_.Canon } | Select-Object -ExpandProperty Sheet -Unique
+
                 if($missingSheets.Count -gt 0){
+
                     $reqIssues++
+
                     $line = "*Saknas* - $k " + ($missingSheets -join ', ')
+
                     [void]$detailsLst.Add($line)
+
                 }
+
             }
+
         }
 
+ 
+
         $issuesTotal = $devIssues + $reqIssues
+
         $summary = if($issuesTotal -eq 0){ 'OK' } else { "Avvikelser: $issuesTotal (avvikare=$devIssues, saknas=$reqIssues)" }
 
+ 
+
         return [pscustomobject]@{
+
             Issues  = $issuesTotal
+
             Summary = $summary
+
             Details = ($detailsLst -join "`r`n")
 
         }
+
     }
+
 }
 
 if (-not (Get-Command Extract-SealTestHeader -ErrorAction SilentlyContinue)) {
 
     function Extract-SealTestHeader {
+
         param([OfficeOpenXml.ExcelPackage]$Pkg)
+
+ 
+
         $result = [pscustomobject]@{ DocumentNumber=$null; Rev=$null; Effective=$null }
+
         if (-not $Pkg) { return $result }
+
+ 
 
         foreach ($ws in $Pkg.Workbook.Worksheets) {
 
             if ($ws.Name -eq 'Worksheet Instructions') { continue }
+
             $right = (($ws.HeaderFooter.OddHeader.RightAlignedText + '') -replace '\r?\n',' ').Trim()
 
             if (-not $right) { $right = (($ws.HeaderFooter.EvenHeader.RightAlignedText + '') -replace '\r?\n',' ').Trim() }
+
+ 
+
             if (-not $result.DocumentNumber -and $right -match '(?i)\bDocument\s*(?:No|Number|#)\s*[:#]?\s*(D\d+)\b') { $result.DocumentNumber = $matches[1] }
+
             if (-not $result.Rev            -and $right -match '(?i)\bRev(?:ision)?\.?\s*[:#]?\s*([A-Z]{1,3}(?:\.\d+)?)\b') { $result.Rev = $matches[1] }
+
             if (-not $result.Effective      -and $right -match '(?i)\bEffective\s*[:#]?\s*([0-9]{1,2}[\/\-][0-9]{1,2}[\/\-][0-9]{4}|[0-9]{4}[\/\-][0-9]{2}[\/\-][0-9]{2})') { $result.Effective = $matches[1] }
+
+ 
+
             if ($result.DocumentNumber -and $result.Rev -and $result.Effective) { break }
+
         }
+
         return $result
 
     }
@@ -1051,12 +1084,19 @@ if (-not (Get-Command Extract-SealTestHeader -ErrorAction SilentlyContinue)) {
 function Normalize-Id {
 
     param([string]$Value, [ValidateSet('Batch','Part','Cartridge')] [string]$Type)
+
     if ([string]::IsNullOrWhiteSpace($Value)) { return $null }
+
     $v = $Value.Trim()
+
     switch ($Type) {
+
         'Batch'     { return ($v -replace '[^\d]', '') }                      # 10 siffror
+
         'Part'      { return (($v -replace '[^0-9A-Za-z\-]', '')).ToUpper() } # t.ex. 700-5702
+
         'Cartridge' { return ($v -replace '[^\d]', '') }                      # 5 siffror
+
         default     { return $v }
 
     }
@@ -1068,221 +1108,379 @@ function Normalize-HeaderText {
     param([string]$s)
 
     if ([string]::IsNullOrEmpty($s)) { return '' }
+
     # Ta bort BOM/zero-width
 
     $s = $s -replace "[\uFEFF\u200B]", ""
+
     # Ta bort inbäddade radbrytningsmarkörer från Excel-export
 
     # t.ex. 700-4370_x000D_ Batch No(s).: 1001502746_x000D_ ...
+
     $s = $s -replace "_x000D_", " "
 
     # NBSP/figur/narrow NBSP → vanligt mellanslag
+
     $s = $s -replace "[\u00A0\u2007\u202F]", " "
 
+ 
+
     # Normalisera olika streck till '-'
+
     $s = $s -replace "[\u2013\u2014\u2212]", "-"
 
+ 
+
     # Kollapsa whitespace och trimma
+
     $s = ($s -replace "\s+", " ").Trim()
+
     return $s
 
 }
 
 function Parse-WorksheetHeaderRaw {
+
     param(
+
         [string]$Raw
+
     )
+
+ 
 
     $obj = [pscustomobject]@{
 
         PartNo         = $null
+
         BatchNo        = $null
+
         CartridgeNo    = $null
+
         DocumentNumber = $null
+
         Attachment     = $null
+
         Rev            = $null
+
         Effective      = $null
+
     }
+
+ 
 
     if (-not $Raw) { return $obj }
 
+ 
+
     # Grundstädning
+
     $txt = $Raw + ''
 
+ 
+
     # Ta bort header-koder (sidnr m.m.)
+
     $txt = $txt -replace '&P', ''
+
     $txt = $txt -replace '&N', ''
+
     $txt = $txt -replace '&L', ' '
 
+ 
+
     # Normalisera (tar också bort _x000D_)
+
     $txt = Normalize-HeaderText $txt
 
+ 
+
     # Document Number + ev. Attachment
+
     $m = [regex]::Match(
+
         $txt,
+
         '(?i)\bDocument\s*Number\b\s*[:#]?\s*(D\d{5})(?:\s+Attachment[:\s]+([0-9A-Za-z\.]+))?'
+
     )
 
     if ($m.Success) {
+
         $obj.DocumentNumber = $m.Groups[1].Value.Trim()
+
         if ($m.Groups.Count -ge 3 -and $m.Groups[2].Value) {
+
             $obj.Attachment = $m.Groups[2].Value.Trim()
+
         }
+
     }
+
+ 
 
     # Fristående "Attachment" om det inte fångades ovan
+
     if (-not $obj.Attachment) {
+
         $m = [regex]::Match($txt, '(?i)\bAttachment\b\s*:?\s*([0-9A-Za-z\.]+)')
+
         if ($m.Success) {
+
             $obj.Attachment = $m.Groups[1].Value.Trim()
+
         }
+
     }
+
+ 
 
     # Rev (t.ex. F, AW, E.1)
+
     $m = [regex]::Match($txt, '(?i)\bRev(?:ision)?\b\s*:?\s*([A-Z0-9]+(?:\.[0-9]+)?)')
+
     if ($m.Success) {
+
         $obj.Rev = $m.Groups[1].Value.Trim()
+
     }
 
+ 
+
     # Effective (t.ex. 4/14/2025 eller 09/20/2023)
+
     $m = [regex]::Match($txt, '(\d{1,2}/\d{1,2}/\d{4})')
+
     if ($m.Success) {
+
         $obj.Effective = $m.Groups[1].Value.Trim()
 
     }
 
+ 
+
     # Part No (t.ex. 700-4370)
+
     $m = [regex]::Match($txt, '(?i)Part\s*No\.\s*:\s*([0-9A-Z\-]+)')
+
     if ($m.Success) {
+
         $obj.PartNo = $m.Groups[1].Value.Trim()
+
     }
 
+ 
+
     # Batch No (t.ex. 1001502746)
+
     $m = [regex]::Match($txt, '(?i)Batch\s*No\(s\)\.\s*:\s*(\d{6,12})')
+
     if ($m.Success) {
+
         $obj.BatchNo = $m.Groups[1].Value.Trim()
 
     }
 
+ 
+
     # Cartridge (LSP, t.ex. 78704)
+
     $m = [regex]::Match($txt, '(?i)Cartridge\s*No\.\s*\(LSP\)\s*:\s*(\d{5,7})')
+
     if ($m.Success) {
+
         $obj.CartridgeNo = $m.Groups[1].Value.Trim()
 
     }
+
+ 
 
     return $obj
 
 }
 
 function Try-Parse-HeaderDate {
+
     param([object]$cellValue, [ref]$out)
+
     $out.Value = $null
+
     if ($null -eq $cellValue) { return $false }
 
  
 
     if ($cellValue -is [double] -or $cellValue -is [int]) {
+
         try { $out.Value = [DateTime]::FromOADate([double]$cellValue); return $true } catch {}
 
     }
 
     if ($cellValue -is [DateTime]) { $out.Value = [DateTime]$cellValue; return $true }
 
+ 
+
     $s = Normalize-HeaderText ([string]$cellValue)
+
     if ([string]::IsNullOrWhiteSpace($s)) { return $false }
 
+ 
+
     $cultures = @('sv-SE','en-US','en-GB')
+
     foreach ($c in $cultures) {
+
         try {
+
             $dt = [DateTime]::Parse($s, [Globalization.CultureInfo]::GetCultureInfo($c), [Globalization.DateTimeStyles]::AssumeLocal)
+
             $out.Value = $dt; return $true
+
         } catch {}
+
     }
 
     $formats = @(
+
         'yyyy-MM-dd','yyyy/MM/dd','dd/MM/yyyy','d/M/yyyy','MM/dd/yyyy','M/d/yyyy',
+
         'dd-MM-yyyy','d-M-yyyy','dd.M.yyyy','d.M.yyyy','dd-MMM-yyyy','MMM-yy'
+
     )
 
     foreach ($fmt in $formats) {
+
         try {
+
             $dt = [DateTime]::ParseExact($s, $fmt, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::AssumeLocal)
+
             $out.Value = $dt; return $true
+
         } catch {}
+
     }
+
     return $false
+
 }
 
 function Get-ConsensusValue {
+
     param(
+
         [string]$Ws,  [string]$Pos, [string]$Neg,
+
         [ValidateSet('Batch','Part','Cartridge')] [string]$Type
+
     )
 
+ 
+
     $nWs  = Normalize-Id $Ws  $Type
+
     $nPos = Normalize-Id $Pos $Type
+
     $nNeg = Normalize-Id $Neg $Type
 
+ 
+
     $present = @{}
+
     if ($nWs)  { $present['WS']  = $nWs  }
+
     if ($nPos) { $present['POS'] = $nPos }
+
     if ($nNeg) { $present['NEG'] = $nNeg }
 
+ 
+
     $chosenNorm = $null
+
     $sources    = @()
 
+ 
+
     $counts = @{}
+
     foreach ($k in $present.Keys) {
 
         $val = $present[$k]
+
         if (-not $counts.ContainsKey($val)) { $counts[$val] = 0 }
+
         $counts[$val]++
 
     }
 
     $maxCount = 0; $maxVal = $null
+
     foreach ($kv in $counts.GetEnumerator()) {
+
         if ($kv.Value -gt $maxCount) { $maxCount = $kv.Value; $maxVal = $kv.Key }
 
     }
 
     if ($maxCount -ge 2) {
+
         $chosenNorm = $maxVal
+
         foreach ($k in $present.Keys) { if ($present[$k] -eq $chosenNorm) { $sources += $k } }
 
     }
 
+ 
+
     if (-not $chosenNorm -and $nWs) {
 
         $posMatch = ($nPos -and $nPos -eq $nWs)
+
         $negMatch = ($nNeg -and $nNeg -eq $nWs)
 
         if (($posMatch -and -not $negMatch) -or ($negMatch -and -not $posMatch)) {
+
             $chosenNorm = $nWs
+
             $sources = @('WS')
+
             if ($posMatch) { $sources += 'POS' }
+
             if ($negMatch) { $sources += 'NEG' }
+
         }
+
     }
 
+ 
+
     if (-not $chosenNorm -and $nPos -and $nNeg -and $nPos -eq $nNeg) {
+
         $chosenNorm = $nPos
+
         $sources = @('POS','NEG')
 
     }
 
+ 
+
     if (-not $chosenNorm) {
+
         if ($nWs)      { $chosenNorm = $nWs;  $sources = @('WS')  }
+
         elseif ($nPos) { $chosenNorm = $nPos; $sources = @('POS') }
+
         elseif ($nNeg) { $chosenNorm = $nNeg; $sources = @('NEG') }
+
     }
 
+ 
+
     $orig = @{ WS=$Ws; POS=$Pos; NEG=$Neg }
+
     $pretty = $null
+
     foreach ($pref in @('WS','POS','NEG')) {
 
         if ($present.ContainsKey($pref) -and $present[$pref] -eq $chosenNorm) { $pretty = $orig[$pref]; break }
+
     }
 
  
@@ -1290,8 +1488,11 @@ function Get-ConsensusValue {
     $note = $null
 
     if ($sources -and $sources.Count -gt 0) {
+
         $note = "Consensus: " + ($sources -join '+')
+
         $others = @()
+
         foreach ($k in @('WS','POS','NEG')) {
 
             if ($present.ContainsKey($k) -and ($sources -notcontains $k)) {
@@ -1299,9 +1500,17 @@ function Get-ConsensusValue {
                 $val = $orig[$k]
 
                 if (-not [string]::IsNullOrEmpty($val)) { $others += ($k + '=' + $val) }
+
             }
+
         }
+
         if ($others.Count -gt 0) { $note += " | Others: " + ($others -join ', ') }
+
     }
+
+ 
+
     return @{ Value=$pretty; Source=($sources -join '+'); Note=$note }
+
 }
