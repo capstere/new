@@ -1,5 +1,30 @@
+<#
+    Module: Splash.ps1
+    Purpose: Minimal splash screen helpers for the Validate-Assay WinForms UI.
+    Platform: PowerShell 5.1, WinForms
+    Notes:
+      - Pure UI scaffolding; no data loading or business logic is triggered here.
+#>
+
 $global:Splash = $null
 
+<#
+    .SYNOPSIS
+        Shows a borderless splash screen with a status message.
+
+    .DESCRIPTION
+        Creates a top-most WinForms splash window used during startup (module load,
+        PnP connect). Keeps logic lightweight to avoid masking slow operations.
+
+    .PARAMETER msg
+        Optional message to display while the app initializes.
+
+    .OUTPUTS
+        None
+    
+    .NOTES
+        UI-only; heavy work must remain outside to keep the form responsive.
+#>
 function Show-Splash([string]$msg = "Startar…") {
 
     Add-Type -AssemblyName System.Windows.Forms, System.Drawing
@@ -23,6 +48,19 @@ function Show-Splash([string]$msg = "Startar…") {
     [Windows.Forms.Application]::DoEvents()
 }
 
+<#
+    .SYNOPSIS
+        Updates the splash message while keeping the UI responsive.
+
+    .PARAMETER msg
+        Text to show on the splash label.
+
+    .OUTPUTS
+        None
+    
+    .NOTES
+        Keeps DoEvents to flush the message pump during startup.
+#>
 function Update-Splash([string]$msg) {
     if ($global:Splash) {
         $global:Splash.Label.Text = $msg
@@ -30,6 +68,16 @@ function Update-Splash([string]$msg) {
     }
 }
 
+<#
+    .SYNOPSIS
+        Closes and disposes the splash form.
+
+    .OUTPUTS
+        None
+    
+    .NOTES
+        Safe to call multiple times; guard with the global Splash hashtable.
+#>
 function Close-Splash() {
     if ($global:Splash) {
         $global:Splash.Form.Close()
