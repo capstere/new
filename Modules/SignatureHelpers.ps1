@@ -1,8 +1,25 @@
-function Get-DataSheets { param([OfficeOpenXml.ExcelPackage]$Pkg)
-    $all = @($Pkg.Workbook.Worksheets | Where-Object { $_.Name -ne "Worksheet Instructions" })
-    if ($all.Count -gt 1) { return $all | Select-Object -Skip 1 } else { return @() }
-}
+<#
+    Module: SignatureHelpers.ps1
+    Purpose: Helpers for signature parsing, confirmation, and sign-off consistency across Seal Test files.
+    Platform: PowerShell 5.1, EPPlus 4.5.3.3 (.NET 3.5)
+    Notes:
+      - Contains only signature-related helpers; data IO lives in DataHelpers.
+#>
 
+<#
+    .SYNOPSIS
+        Performs a lightweight syntax check of a signature string.
+
+    .DESCRIPTION
+        Splits the supplied text by commas to identify name, sign, and date parts.
+        Used before writing signature cells to Seal Test sheets.
+
+    .PARAMETER Text
+        Signature string in format "Full Name, Sign, Date".
+
+    .OUTPUTS
+        PSCustomObject with Raw/Name/Sign/Date/Parts/DateOk/LooksOk.
+#>
 function Test-SignatureFormat {
     param([string]$Text)
     $raw = ($Text + '')
@@ -16,6 +33,20 @@ function Test-SignatureFormat {
     [pscustomobject]@{ Raw=$raw; Name=$name; Sign=$sign; Date=$date; Parts=$parts.Count; DateOk=$dateOk; LooksOk=($name -ne '' -and $sign -ne '') }
 }
 
+<#
+    .SYNOPSIS
+        Asks the operator to confirm the parsed signature string.
+
+    .DESCRIPTION
+        Presents a WinForms MessageBox showing detected Name/Sign/Date segments to
+        avoid accidental sign-off mistakes.
+
+    .PARAMETER Text
+        Signature string to parse and confirm.
+
+    .OUTPUTS
+        Boolean indicating whether the user confirmed.
+#>
 function Confirm-SignatureInput { param([string]$Text)
     $info = Test-SignatureFormat $Text
     $hint = @()
@@ -32,6 +63,16 @@ Tolkning:
     return ($res -eq 'Yes')
 }
 
+<#
+    .SYNOPSIS
+        Normalizes signature text for comparison (case/spacing insensitive).
+
+    .PARAMETER s
+        Raw signature string.
+
+    .OUTPUTS
+        Lower-cased, comma-trimmed signature representation.
+#>
 function Normalize-Signature {
     param([string]$s)
     if (-not $s) { return '' }
@@ -41,6 +82,23 @@ function Normalize-Signature {
     return $x
 }
  
+<#
+    .SYNOPSIS
+        Builds a normalized signature set across all Seal Test data sheets.
+
+    .DESCRIPTION
+        Iterates the data sheets (skips "Worksheet Instructions") and collects
+        signatures from B47 to detect mismatches between NEG and POS workbooks.
+
+    .PARAMETER Pkg
+        EPPlus package for a Seal Test workbook.
+
+    .OUTPUTS
+        PSCustomObject with RawFirst, NormSet (HashSet), Occurrence map, and RawByNorm.
+
+    .NOTES
+        Heavy operation: loops all data sheets to extract signatures.
+#>
 function Get-SignatureSetForDataSheets {
     param([OfficeOpenXml.ExcelPackage]$Pkg)
     $result = [pscustomobject]@{
@@ -72,56 +130,4 @@ function Get-SignatureSetForDataSheets {
         }
     }
     return $result
-}
-
-function UrlEncode([string]$s){ try { [System.Uri]::EscapeDataString($s) } catch { $s } }
-
-function Get-BatchNumberFromSealFile([string]$Path){
-    if (-not (Test-Path -LiteralPath $Path)) { return $null }
-    if (-not (Load-EPPlus)) { return $null }
-    $pkg = $null
-    try {
-        $pkg = New-Object OfficeOpenXml.ExcelPackage (New-Object IO.FileInfo($Path))
-        foreach ($ws in (Get-DataSheets $pkg)) {
-            $txt = ($ws.Cells['D2'].Text + '').Trim()   # "Batch Number"
-            if ($txt) { return $txt }
-        }
-    } catch {
-        Gui-Log "⚠️ Get-BatchNumberFromSealFile: $($_.Exception.Message)" 'Warn'
-    } finally { if ($pkg) { try { $pkg.Dispose() } catch {} } }
-    return $null
-}
-
-function Update-BatchLink {
-    try {
-        $selNeg = Get-CheckedFilePath $clbNeg
-        $selPos = Get-CheckedFilePath $clbPos
-        $bnNeg  = if ($selNeg) { Get-BatchNumberFromSealFile $selNeg } else { $null }
-        $bnPos  = if ($selPos) { Get-BatchNumberFromSealFile $selPos } else { $null }
-        $lsp    = $txtLSP.Text.Trim()
-        $mismatch = ($bnNeg -and $bnPos -and ($bnNeg -ne $bnPos))
-        if ($mismatch) {
-            $slBatchLink.Text        = 'SharePoint: mismatch'
-            $slBatchLink.Enabled     = $false
-            $slBatchLink.Tag         = $null
-            $slBatchLink.ToolTipText = "NEG: $bnNeg  |  POS: $bnPos"
-            return
-        }
-        $batch = if ($bnPos) { $bnPos } elseif ($bnNeg) { $bnNeg } else { $null }
-        if ($batch) {
-            $url = $SharePointBatchLinkTemplate -replace '\{BatchNumber\}', (UrlEncode $batch) -replace '\{LSP\}', (UrlEncode $lsp)
-
-            $slBatchLink.Text        = "SharePoint: $batch"
-            $slBatchLink.Enabled     = $true
-            $slBatchLink.Tag         = $url
-            $slBatchLink.ToolTipText = $url
-        } else {
-            $slBatchLink.Text        = 'SharePoint: —'
-            $slBatchLink.Enabled     = $false
-            $slBatchLink.Tag         = $null
-            $slBatchLink.ToolTipText = 'Direktlänk aktiveras när Batch# hittas i sökt LSP.'
-        }
-    } catch {
-        Gui-Log "⚠️ Update-BatchLink: $($_.Exception.Message)" 'Warn'
-    }
 }
