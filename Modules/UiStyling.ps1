@@ -1,3 +1,29 @@
+<#
+    Module: UiStyling.ps1
+    Purpose: Light theme helpers for WinForms controls used by Validate-Assay.
+    Platform: PowerShell 5.1, WinForms
+    Notes:
+      - No dark theme toggle is supported; all helpers assume a light palette.
+      - Functions are UI-only and should not contain business logic.
+#>
+
+<#
+    .SYNOPSIS
+        Adds a click-able shortcut item to a ToolStrip menu.
+
+    .DESCRIPTION
+        Creates a ToolStripMenuItem that opens either a URL, folder, or file path.
+        Used sparingly to keep the operator menu uncluttered.
+
+    .PARAMETER Parent
+        Parent ToolStripMenuItem that will host the shortcut.
+    .PARAMETER Text
+        Menu text (emoji + Swedish labels are allowed).
+    .PARAMETER Target
+        URL or file/folder path to open.
+    .OUTPUTS
+        None
+#>
 function Add-ShortcutItem {
     param(
 
@@ -33,6 +59,12 @@ function Add-ShortcutItem {
     [void]$Parent.DropDownItems.Add($it)
 }
 
+<#
+    .SYNOPSIS
+        Reads the Windows accent color to align buttons with system styling.
+    .OUTPUTS
+        [System.Drawing.Color] fallback to light blue if registry is unavailable.
+#>
 function Get-WinAccentColor {
     try {
         $p = Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\DWM' -ErrorAction Stop
@@ -51,6 +83,21 @@ $AccentBorder = Darken $Accent 0.75
 $AccentHover = Lighten $Accent 0.12
 $AccentDisabled = New-Color 255 210 210 210
 
+<#
+    .SYNOPSIS
+        Applies a flat accent style to WinForms buttons.
+
+    .PARAMETER Btn
+        Target System.Windows.Forms.Button to style.
+    .PARAMETER Primary
+        Switch to indicate the main action button (filled accent background).
+
+    .OUTPUTS
+        None
+    
+    .NOTES
+        Keeps styling logic central so UI layout remains clean in Main.ps1.
+#>
 function Set-AccentButton {
     param([System.Windows.Forms.Button]$Btn, [switch]$Primary)
     $Btn.FlatStyle = 'Flat'
