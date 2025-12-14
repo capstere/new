@@ -2293,6 +2293,7 @@ function Convert-ToEqDate {
     .NOTES
         Heavy operation – runs the entire pipeline previously embedded in Main.ps1.
 #>
+
 function Invoke-AssayReportBuild {
     param(
         [string]$CsvPath,
@@ -2307,30 +2308,34 @@ function Invoke-AssayReportBuild {
         [bool]$SaveInLsp = $false,
         [System.Windows.Forms.ToolStripStatusLabel]$SharePointLinkLabel
     )
+
     if (-not (Assert-StartupReady)) { return }
     Gui-Log 'Skapar rapport…' -Immediate
-    try {
-    if (-not (Load-EPPlus)) { Gui-Log "❌ EPPlus kunde inte laddas – avbryter." 'Error'; return }
-     
-    $selCsv = $CsvPath
-    $selNeg = $SealNegPath
-    $selPos = $SealPosPath
-    
-    if (-not $selNeg -or -not $selPos) { Gui-Log "❌ Du måste välja en Seal NEG och en Seal POS." 'Error'; return }
-    $lsp = ($Lsp + '').Trim()
-    if (-not $lsp) { Gui-Log "⚠️ Ange ett LSP-nummer." 'Warn'; return }
-    
-    Gui-Log "📄 Neg-fil: $(Split-Path $selNeg -Leaf)" 'Info'
-    Gui-Log "📄 Pos-fil: $(Split-Path $selPos -Leaf)" 'Info'
-    if ($selCsv) { Gui-Log "📄 CSV: $(Split-Path $selCsv -Leaf)" 'Info' } else { Gui-Log "ℹ️ Ingen CSV vald." 'Info' }
-    
-    $negWritable = $true; $posWritable = $true
-    if ($SignSealTest) {
-        $negWritable = -not (Test-FileLocked $selNeg); if (-not $negWritable) { Gui-Log "🔒 NEG är låst (öppen i Excel?)." 'Warn' }
-        $posWritable = -not (Test-FileLocked $selPos); if (-not $posWritable) { Gui-Log "🔒 POS är låst (öppen i Excel?)." 'Warn' }
-    }
-    $pkgNeg = $null; $pkgPos = $null; $pkgOut = $null
-    try {
+
+    try {  # === OUTER TRY (ska sluta med FINALLY) ===
+        if (-not (Load-EPPlus)) { Gui-Log "❌ EPPlus kunde inte laddas – avbryter." 'Error'; return }
+
+        $selCsv = $CsvPath
+        $selNeg = $SealNegPath
+        $selPos = $SealPosPath
+
+        if (-not $selNeg -or -not $selPos) { Gui-Log "❌ Du måste välja en Seal NEG och en Seal POS." 'Error'; return }
+        $lsp = ($Lsp + '').Trim()
+        if (-not $lsp) { Gui-Log "⚠️ Ange ett LSP-nummer." 'Warn'; return }
+
+        Gui-Log "📄 Neg-fil: $(Split-Path $selNeg -Leaf)" 'Info'
+        Gui-Log "📄 Pos-fil: $(Split-Path $selPos -Leaf)" 'Info'
+        if ($selCsv) { Gui-Log "📄 CSV: $(Split-Path $selCsv -Leaf)" 'Info' } else { Gui-Log "ℹ️ Ingen CSV vald." 'Info' }
+
+        $negWritable = $true; $posWritable = $true
+        if ($SignSealTest) {
+            $negWritable = -not (Test-FileLocked $selNeg); if (-not $negWritable) { Gui-Log "🔒 NEG är låst (öppen i Excel?)." 'Warn' }
+            $posWritable = -not (Test-FileLocked $selPos); if (-not $posWritable) { Gui-Log "🔒 POS är låst (öppen i Excel?)." 'Warn' }
+        }
+
+        $pkgNeg = $null; $pkgPos = $null; $pkgOut = $null
+
+        # --- Öppna NEG/POS ---
         try {
             $pkgNeg = New-Object OfficeOpenXml.ExcelPackage (New-Object IO.FileInfo($selNeg))
             $pkgPos = New-Object OfficeOpenXml.ExcelPackage (New-Object IO.FileInfo($selPos))
@@ -2338,16 +2343,22 @@ function Invoke-AssayReportBuild {
             Gui-Log "❌ Kunde inte öppna NEG/POS: $($_.Exception.Message)" 'Error'
             return
         }
-     
+
         $templatePath = $Config.TemplatePath
-        if (-not (Test-Path -LiteralPath $templatePath)) { Gui-Log "❌ Mallfilen 'output_template-v4.xlsx' saknas!" 'Error'; return }
-        try {
-            $pkgOut = New-Object OfficeOpenXml.ExcelPackage (New-Object IO.FileInfo($templatePath))
-        } catch {
-            Gui-Log "❌ Kunde inte läsa mall: $($_.Exception.Message)" 'Error'
+
+        if ([string]::IsNullOrWhiteSpace($templatePath) -or -not (Test-Path -LiteralPath $templatePath)) {
+            Gui-Log "❌ Mallfilen 'output_template-v4.xlsx' saknas eller har ogiltig sökväg. Kontrollera Config.ps1 och att filen ligger bredvid Main.ps1." 'Error'
             return
         }
-    
+
+        try {
+            $pkgOut = New-Object OfficeOpenXml.ExcelPackage (New-Object IO.FileInfo($templatePath))
+        }
+        catch {
+            Gui-Log "❌ Kunde inte öppna mallfilen 'output_template-v4.xlsx': $($_.Exception.Message)" 'Error'
+            return
+        }
+       
         # ============================
         # === SIGNATUR I NEG/POS  ====
         # ============================
@@ -3828,6 +3839,7 @@ function Invoke-AssayReportBuild {
                             $wsSp.Cells[2,1].Value = "Batch";  $wsSp.Cells[2,2].Value = $batch
                             $wsSp.Cells[3,1].Value = "Info";   $wsSp.Cells[3,2].Value = "No matching SharePoint row"
                         }
+
                         try { $wsSp.Cells[$wsSp.Dimension.Address].AutoFitColumns() | Out-Null } catch {}
                     }
                     try {
