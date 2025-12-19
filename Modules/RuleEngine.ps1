@@ -1,14 +1,4 @@
-﻿#requires -Version 5.1
-<#
-  RuleEngine.ps1
-  PowerShell 5.1 compatible. Human-first Information2 with drill-down.
-
-  Design goals:
-  - NEVER crash on OrderedDictionary vs Hashtable differences (RuleBank uses [ordered] heavily).
-  - Fail "soft": collect debug/errors and emit Findings instead of throwing.
-  - Data-only RuleBank remains untouched; RuleEngine adapts safely.
-  - EPPlus 4.5.3.3 friendly.
-#>
+#requires -Version 5.1
 
 # -----------------------------
 # Map helpers (Hashtable + OrderedDictionary safe)
