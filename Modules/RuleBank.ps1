@@ -53,38 +53,38 @@ $globalRules = [ordered]@{
     CartridgeSN = [ordered]@{ Severity='Warn'; RuleId='DUP_CARTRIDGE_SN' }
   }
 
-ValidationPolicy = [ordered]@{
-  # Duplicates & naming / workflow
-  DUPLICATE_SAMPLE_ID      = 'Warn'
-  DUPLICATE_CARTRIDGE_SN   = 'Warn'
-  REPLACEMENTS_PRESENT     = 'Info'
-  DELAMINATIONS_PRESENT    = 'Info'
-  SAMPLEID_PARSE_FAILED    = 'Warn'
-  WRONG_TEST_TYPE          = 'Warn'
-  MISSING_BAG_SAMPLES      = 'Info'
+  ValidationPolicy = [ordered]@{
+    # Duplicates & naming / workflow
+    DUPLICATE_SAMPLE_ID      = 'Warn'
+    DUPLICATE_CARTRIDGE_SN   = 'Warn'
+    REPLACEMENTS_PRESENT     = 'Info'
+    DELAMINATIONS_PRESENT    = 'Info'
+    SAMPLEID_PARSE_FAILED    = 'Warn'
+    WRONG_TEST_TYPE          = 'Warn'
+    MISSING_BAG_SAMPLES      = 'Info'
 
-  # Buckets / classification
-  MINOR_FUNCTIONAL_ERROR   = 'Warn'
-  MAJOR_FUNCTIONAL_ERROR   = 'Error'
-  INSTRUMENT_ERROR         = 'Error'
-  REPEAT_ERRORS_IN_MODULE  = 'Info'
-}
+    # Buckets / classification
+    MINOR_FUNCTIONAL_ERROR   = 'Warn'
+    MAJOR_FUNCTIONAL_ERROR   = 'Error'
+    INSTRUMENT_ERROR         = 'Error'
+    REPEAT_ERRORS_IN_MODULE  = 'Info'
+  }
 
-ErrorClassification = [ordered]@{
-  # Used by the engine as default "Minor functional" allowlist (no re-test)
-  MinorFunctionalErrorCodes = @(
-    '2008','2009','2125','2096','2097','2037',
-    '5006','5007','5008','5009','5017','5018','5019',
-    '5001','5002','5003','5004','5005','5015','5016',
-    '5011'
-  )
-}
+  ErrorClassification = [ordered]@{
+    # Used by the engine as default "Minor functional" allowlist (no re-test)
+    MinorFunctionalErrorCodes = @(
+      '2008','2009','2125','2096','2097','2037',
+      '5006','5007','5008','5009','5017','5018','5019',
+      '5001','5002','5003','5004','5005','5015','5016',
+      '5011'
+    )
+  }
 
-# Alias to support report conditional formatting
-PressurePolicy = [ordered]@{
-  WarnThreshold = 85
-  FailThreshold = 90
-}
+  # Alias to support report conditional formatting
+  PressurePolicy = [ordered]@{
+    WarnThreshold = 85
+    FailThreshold = 90
+  }
 
   SampleId = [ordered]@{
     Parse = [ordered]@{
@@ -92,13 +92,13 @@ PressurePolicy = [ordered]@{
       Example = 'S1-001-01'
     }
 
-UnderscoreBag = [ordered]@{
-  Enabled          = $false
-  BagMin           = 0
-  BagMax           = 10
-  Bag0SampleMax    = 10
-  OtherBagSampleMax= 20
-}
+    UnderscoreBag = [ordered]@{
+      Enabled           = $false
+      BagMin            = 0
+      BagMax            = 10
+      Bag0SampleMax     = 10
+      OtherBagSampleMax = 20
+    }
 
     Roles = [ordered]@{
       CTRL  = 'Control'
@@ -260,53 +260,53 @@ $assayProfiles = [ordered]@{
   'Xpert HPV v2 HR'                    = [ordered]@{ Mode='GlobalOnly'; Description='Stub profile'; DisplayName='Xpert HPV v2 HR' }
   'Xpert MRSA NxG'                     = [ordered]@{ Mode='GlobalOnly'; Description='Stub profile'; DisplayName='Xpert MRSA NxG' }
   'Xpert MTB-RIF Assay G4'             = [ordered]@{ Mode='GlobalOnly'; Description='Stub profile'; DisplayName='Xpert MTB-RIF Assay G4' }
-'Xpert MTB-RIF JP IVD'               = [ordered]@{
-  Mode        = 'SpecimenOnly'
-  Description = 'JP IVD – specimen-only defaults (no underscore-bag expectations).'
-  DisplayName = 'Xpert MTB-RIF JP IVD'
-  Enable      = [ordered]@{
-    UnderscoreBagSampleRules    = $false
-    WrongTestTypeByControlIndex = $false
-  }
-}
-'Xpert MTB-RIF Ultra'                = [ordered]@{
-  Mode        = 'ControlsByTestType'
-  Description = 'Ultra control run rules (underscore-bag SampleID parsing, expected results).'
-  DisplayName = 'Xpert MTB-RIF Ultra'
-  Enable      = [ordered]@{
-    UnderscoreBagSampleRules      = $true
-    WrongTestTypeByControlIndex   = $true
-  }
-  WrongTestType = [ordered]@{
-    Default  = 'Specimen'
-    Controls = [ordered]@{
-      0 = 'Negative Control 1'
-      1 = 'Positive Control 1'
-      2 = 'Positive Control 2'
+  'Xpert MTB-RIF JP IVD'               = [ordered]@{
+    Mode        = 'SpecimenOnly'
+    Description = 'JP IVD – specimen-only defaults (no underscore-bag expectations).'
+    DisplayName = 'Xpert MTB-RIF JP IVD'
+    Enable      = [ordered]@{
+      UnderscoreBagSampleRules    = $false
+      WrongTestTypeByControlIndex = $false
     }
   }
-  ExpectedResults = [ordered]@{
-    'Negative Control 1' = @(
-      '(?i)\AMTB\s+NOT\s+DETECTED\z'
-    )
-    'Positive Control 1' = @(
-      '(?i)\AMTB\s+DETECTED\s+(VERY\s+LOW|LOW|MEDIUM|HIGH)\s*;\s*RIF\s+Resistance\s+DETECTED\z'
-    )
-    'Positive Control 2' = @(
-      '(?i)\AMTB\s+DETECTED\s+(VERY\s+LOW|LOW|MEDIUM|HIGH)\s*;\s*RIF\s+Resistance\s+NOT\s+DETECTED\z'
-    )
+  'Xpert MTB-RIF Ultra'                = [ordered]@{
+    Mode        = 'ControlsByTestType'
+    Description = 'Ultra control run rules (underscore-bag SampleID parsing, expected results).'
+    DisplayName = 'Xpert MTB-RIF Ultra'
+    Enable      = [ordered]@{
+      UnderscoreBagSampleRules      = $true
+      WrongTestTypeByControlIndex   = $true
+    }
+    WrongTestType = [ordered]@{
+      Default  = 'Specimen'
+      Controls = [ordered]@{
+        0 = 'Negative Control 1'
+        1 = 'Positive Control 1'
+        2 = 'Positive Control 2'
+      }
+    }
+    ExpectedResults = [ordered]@{
+      'Negative Control 1' = @(
+        '(?i)\AMTB\s+NOT\s+DETECTED\z'
+      )
+      'Positive Control 1' = @(
+        '(?i)\AMTB\s+DETECTED\s+(VERY\s+LOW|LOW|MEDIUM|HIGH)\s*;\s*RIF\s+Resistance\s+DETECTED\z'
+      )
+      'Positive Control 2' = @(
+        '(?i)\AMTB\s+DETECTED\s+(VERY\s+LOW|LOW|MEDIUM|HIGH)\s*;\s*RIF\s+Resistance\s+NOT\s+DETECTED\z'
+      )
+    }
+    # Assay-specific allow-list:
+    # Some positive controls may yield "MTB DETECTED; Rif Resistance INDETERMINATE" and should be treated as acceptable for Ultra.
+    AdditionalAcceptedResults = [ordered]@{
+      'Positive Control 1' = @(
+        '(?i)\AMTB\s+DETECTED(\s+(VERY\s+LOW|LOW|MEDIUM|HIGH))?\s*;\s*RIF\s+Resistance\s+INDETERMINATE\z'
+      )
+      'Positive Control 2' = @(
+        '(?i)\AMTB\s+DETECTED(\s+(VERY\s+LOW|LOW|MEDIUM|HIGH))?\s*;\s*RIF\s+Resistance\s+INDETERMINATE\z'
+      )
+    }
   }
-  # Assay-specific allow-list:
-  # Some positive controls may yield "MTB DETECTED; Rif Resistance INDETERMINATE" and should be treated as acceptable for Ultra.
-  AdditionalAcceptedResults = [ordered]@{
-    'Positive Control 1' = @(
-      '(?i)\AMTB\s+DETECTED(\s+(VERY\s+LOW|LOW|MEDIUM|HIGH))?\s*;\s*RIF\s+Resistance\s+INDETERMINATE\z'
-    )
-    'Positive Control 2' = @(
-      '(?i)\AMTB\s+DETECTED(\s+(VERY\s+LOW|LOW|MEDIUM|HIGH))?\s*;\s*RIF\s+Resistance\s+INDETERMINATE\z'
-    )
-  }
-}
   'Xpert MTB-XDR'                      = [ordered]@{ Mode='GlobalOnly'; Description='Stub profile'; DisplayName='Xpert MTB-XDR' }
   'Xpert Norovirus'                    = [ordered]@{ Mode='GlobalOnly'; Description='Stub profile'; DisplayName='Xpert Norovirus' }
   'Xpert SA Nasal Complete G3'         = [ordered]@{ Mode='GlobalOnly'; Description='Stub profile'; DisplayName='Xpert SA Nasal Complete G3' }
@@ -336,4 +336,3 @@ $global:RuleBank = [ordered]@{
 try {
   Remove-Variable assayAliasesFromFile,builtinAssayAliases,assayAliases,baseline,globalRules,errorBank,assayProfiles -ErrorAction SilentlyContinue
 } catch {}
-
