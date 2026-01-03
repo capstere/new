@@ -70,43 +70,66 @@ try {
 } catch { Gui-Log "❌ Test-Config misslyckades: $($_.Exception.Message)" 'Error'; $global:StartupReady = $false }
 
 $Host.UI.RawUI.WindowTitle = "Startar…"
-Show-Splash "Laddar PnP.PowerShell…"
-$global:SpConnected = $false
-$global:SpError     = $null
+Show-Splash "Initierar gränssnitt…"
+$global:SpConnected     = $false
+$global:SpError         = $null
+$global:SpModuleLoaded  = $false
 
-try {
-    $null = Get-PackageProvider -Name "NuGet" -ForceBootstrap -ErrorAction SilentlyContinue
-} catch {}
-
-try {
-    Update-Splash "Laddar..."
-    Import-Module PnP.PowerShell -ErrorAction Stop
-} catch {
-    try {
-        Gui-Log "ℹ️ PowerShell-modulen saknas, installerar modulen..." 'Info'
-        Install-Module PnP.PowerShell -MaximumVersion 1.12.0 -Scope CurrentUser -Force -AllowClobber -ErrorAction Stop
-        Update-Splash "Laddar..."
-        Import-Module PnP.PowerShell -ErrorAction Stop
-    } catch {
-        $global:SpError = "PnP-install/import misslyckades: $($_.Exception.Message)"
-    }
+if (-not $Config.SharePointEnabled) {
+    $global:SpError = "SharePoint-funktioner är inaktiverade i konfigurationen."
+    Gui-Log "ℹ️ $($global:SpError) Click Less startar utan PnP.PowerShell." 'Info'
 }
-$env:PNPPOWERSHELL_UPDATECHECK = "Off"
 try { Initialize-EPPlus -HintPath $Config.EpplusDllPath | Out-Null } catch { Gui-Log "⚠️ EPPlus-förkontroll misslyckades: $($_.Exception.Message)" 'Warn' }
 
-if (-not $global:SpError) {
+function Ensure-SharePointModule {
+    if (-not $Config.SharePointEnabled) { return $false }
+    if ($global:SpModuleLoaded) { return $true }
+    try { $null = Get-PackageProvider -Name "NuGet" -ForceBootstrap -ErrorAction SilentlyContinue } catch {}
     try {
-        Update-Splash "Ansluter till SharePoint"
+        Import-Module PnP.PowerShell -ErrorAction Stop
+        $global:SpModuleLoaded = $true
+        $global:SpError = $null
+        $env:PNPPOWERSHELL_UPDATECHECK = "Off"
+        return $true
+    } catch {
+        if (-not $Config.SharePointInstallMissing) {
+            $global:SpError = "PnP.PowerShell saknas och installation är avstängd/offline."
+            Gui-Log "ℹ️ $global:SpError" 'Info'
+            return $false
+        }
+        try {
+            Gui-Log "ℹ️ PowerShell-modulen saknas, installerar modulen..." 'Info'
+            Install-Module PnP.PowerShell -MaximumVersion 1.12.0 -Scope CurrentUser -Force -AllowClobber -ErrorAction Stop
+            Import-Module PnP.PowerShell -ErrorAction Stop
+            $global:SpModuleLoaded = $true
+            $global:SpError = $null
+            $env:PNPPOWERSHELL_UPDATECHECK = "Off"
+            return $true
+        } catch {
+            $global:SpError = "PnP-install/import misslyckades: $($_.Exception.Message)"
+            Gui-Log "⚠️ $global:SpError" 'Warn'
+            return $false
+        }
+    }
+}
+
+function Ensure-SharePointConnection {
+    if (-not (Ensure-SharePointModule)) { return $false }
+    if ($global:SpConnected) { return $true }
+    try {
         Connect-PnPOnline -Url $global:SP_SiteUrl `
                           -Tenant $global:SP_Tenant `
                           -ClientId $global:SP_ClientId `
                           -CertificateBase64Encoded $global:SP_CertBase64 `
                           -ErrorAction Stop
         $global:SpConnected = $true
+        $global:SpError = $null
+        return $true
     } catch {
         $msg = "Connect-PnPOnline misslyckades: $($_.Exception.Message)"
-        Update-Splash $msg
         $global:SpError = $msg
+        Gui-Log "⚠️ $msg" 'Warn'
+        return $false
     }
 }
 
@@ -2573,14 +2596,15 @@ try {
                 try { $old = $pkgOut.Workbook.Worksheets["SharePoint Info"]; if ($old) { $pkgOut.Workbook.Worksheets.Delete($old) } } catch {}
             } else {
                 $spOk = $false
-                if ($global:SpConnected) { $spOk = $true }
-                elseif (Get-Command Get-PnPConnection -ErrorAction SilentlyContinue) {
-                    try { $null = Get-PnPConnection; $spOk = $true } catch { $spOk = $false }
-                }
- 
-                if (-not $spOk) {
-                    $errMsg = if ($global:SpError) { $global:SpError } else { 'Okänt fel' }
-                    Gui-Log ("⚠️ SharePoint ej tillgängligt: $errMsg") 'Warn'
+                if (-not $Config.SharePointEnabled) {
+                    $errMsg = if ($global:SpError) { $global:SpError } else { 'SharePoint är inaktiverat.' }
+                    Gui-Log ("ℹ️ SharePoint Info avaktiverat: $errMsg") 'Info'
+                } else {
+                    $spOk = Ensure-SharePointConnection
+                    if (-not $spOk) {
+                        $errMsg = if ($global:SpError) { $global:SpError } else { 'Okänt fel' }
+                        Gui-Log ("⚠️ SharePoint ej tillgängligt: $errMsg") 'Warn'
+                    }
                 }
 
                 $batchInfo = Get-BatchLinkInfo -SealPosPath $selPos -SealNegPath $selNeg -Lsp $lsp
@@ -2856,6 +2880,16 @@ $toolTip.SetToolTip($rbSaveInLsp, 'Spara rapporten i mappen för ditt LSP.')
 $toolTip.SetToolTip($rbTempOnly, 'Skapa rapporten temporär utan att spara.')
 $toolTip.SetToolTip($btnBuild, 'Skapa och öppna rapporten baserat på de valda filerna.')
 $toolTip.SetToolTip($chkSharePointInfo, 'Exportera med SharePoint Info.')
+if (-not $Config.SharePointEnabled) {
+    $chkSharePointInfo.Checked = $false
+    $chkSharePointInfo.Enabled = $false
+    $chkSharePointInfo.Text = "SharePoint Info (inaktiverat)"
+    $toolTip.SetToolTip($chkSharePointInfo, 'SharePoint-funktioner är avstängda i konfigurationen.')
+    $slBatchLink.Text = 'SharePoint: inaktiverat'
+    $slBatchLink.Enabled = $false
+} elseif (-not $Config.SharePointInstallMissing) {
+    $toolTip.SetToolTip($chkSharePointInfo, 'SharePoint Info kräver PnP.PowerShell. Installation är avstängd/offline-läge.')
+}
 $txtLSP.add_TextChanged({ Update-BatchLink })
 
 #region Main Run / Orchestration

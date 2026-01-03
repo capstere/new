@@ -94,6 +94,13 @@ function Get-BatchNumberFromSealFile([string]$Path){
 
 function Update-BatchLink {
     try {
+        if (-not $Config.SharePointEnabled) {
+            $slBatchLink.Text        = 'SharePoint: inaktiverat'
+            $slBatchLink.Enabled     = $false
+            $slBatchLink.Tag         = $null
+            $slBatchLink.ToolTipText = 'SharePoint-funktioner är avstängda i konfigurationen.'
+            return
+        }
         $selNeg = Get-CheckedFilePath $clbNeg
         $selPos = Get-CheckedFilePath $clbPos
         $bnNeg  = if ($selNeg) { Get-BatchNumberFromSealFile $selNeg } else { $null }
