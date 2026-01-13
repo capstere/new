@@ -1,4 +1,0 @@
-MarkerType,SampleTokenIndex,Marker,Notes
-Replacement,3,A,Sample token contains 'A' -> Replacement
-Delamination,3,D,"Sample token contains 'D' -> Delamination present. When determining Sample ID suffix (X/+), ignore/remove delamination code tokens like D2B, D05, D11 etc."
-DelaminationCodeRegex,3,REGEX:D\d{2}[A-Z]?,"Delamination code pattern. Before extracting suffix X/+, strip trailing delamination code matching this regex from the Sample token."
