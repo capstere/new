@@ -1,0 +1,2 @@
+SampleTokenIndex,XChar,PlusChar,Notes
+3,X,+,"Determine expected Sample ID suffix (X/+) via parity rule using the lowest numeric Cartridge S/N. If lowest Cartridge S/N ends with an odd digit => odd S/N => X and even S/N => +. If lowest ends with an even digit => even S/N => X and odd S/N => +. When extracting suffix, ignore delamination codes (e.g., D2B, D05, D11) in the Sample token."
