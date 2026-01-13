@@ -1,3 +1,0 @@
-Assay,Expected,SampleIdMatchType,SampleIdPattern,Priority,Enabled,Note
-*,NEG,prefix,NEG_,60,True,Default: Sample ID starting with NEG_ is expected NEG
-*,POS,prefix,POS_,60,True,Default: Sample ID starting with POS_ is expected POS
