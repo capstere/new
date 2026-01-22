@@ -1,0 +1,19 @@
+FamilyName,AssayPatterns,IsMTB,AllowedTestTypes,PosIndicators,NegIndicators,ErrorIndicators,IndeterminateIndicators,PosWins,Notes
+FLUVID plus,*flu*rsv*plus*;*sars*flu*rsv*plus*;xpress*flu*rsv*plus*,FALSE,Specimen;Negative Control 1;Positive Control 1;Positive Control 2;Positive Control 3;Positive Control 4;Positive Control 5,DETECTED;POSITIVE,NOT DETECTED;NEGATIVE,ERROR;NO RESULT;INVALID,,TRUE,Multi-target: om både POS och NEG i samma Test Result → POS.
+GBS,*gbs*,FALSE,Specimen;Negative Control 1;Positive Control 1,DETECTED;POSITIVE,NOT DETECTED;NEGATIVE,ERROR;NO RESULT;INVALID,,TRUE,Standard.
+MTB Ultra,*mtb*ultra*;*gxmtb*,TRUE,Specimen;Negative Control 1;Positive Control 1;Positive Control 2;Positive Control 3;Positive Control 4;Positive Control 5,MTB DETECTED;TRACE DETECTED,MTB NOT DETECTED,ERROR;NO RESULT;INVALID,INDETERMINATE;RIF INDETERMINATE,TRUE,MTB körs i specialspår; här är bara fallback-indikatorer om ni vill.
+,,,,,,,,,
+,,,,,,,,,
+,,,,,,,,,
+,,,,,,,,,
+,,,,,,,,,
+,,,,,,,,,
+,,,,,,,,,
+,,,,,,,,,
+,,,,,,,,,
+,,,,,,,,,
+,,,,,,,,,
+,,,,,,,,,
+,,,,,,,,,
+,,,,,,,,,
+,,,,,,,,,
