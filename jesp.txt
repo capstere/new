@@ -1,0 +1,382 @@
+Absolut. Här är en mer självgående PS5.1-snutt som:
+	•	frågar efter mapp eller enskild CSV (du kan ange sökväg)
+	•	frågar efter output-mapp
+	•	skannar Test Summary-format (header rad 8, data rad 10)
+	•	bygger assay-familj-profiler från verklig data:
+	•	Assay
+	•	Assay Version (unika)
+	•	Test Type (unika)
+	•	“har den kontroller?” (Negative Control 1 / Positive Control 1..5)
+	•	Sample ID: försöker beskriva “namn-stil” (enkla heuristiker + exempel)
+	•	Test Result: samlar unika tokens och exempel (DETECTED/NOT DETECTED/INVALID/NO RESULT osv)
+	•	skriver flera outputs i output-mappen (för att du ska kunna skicka dem tillbaka)
+
+Det här ger mig exakt det jag behöver för att bygga 08-regler och “familjer” utan att gissa.
+
+⸻
+
+PS5.1 – självgående “Assay Family Profiler”
+
+Kopiera allt nedan till t.ex. Build-AssayFamilyProfile.ps1 och kör.
+
+#requires -Version 5.1
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+function Prompt-Path([string]$prompt) {
+  Write-Host $prompt
+  $p = Read-Host "Path"
+  if (-not $p) { throw "No path provided." }
+  return $p.Trim('"')
+}
+
+function Ensure-Folder([string]$p) {
+  if (-not (Test-Path $p)) { New-Item -ItemType Directory -Path $p | Out-Null }
+}
+
+function Normalize-Whitespace([string]$s) {
+  if ($null -eq $s) { return '' }
+  return ([regex]::Replace($s, '\s+', ' ')).Trim()
+}
+
+function Get-DelimiterFromHeaderLine([string]$headerLine) {
+  $semi = ([regex]::Matches($headerLine, ';')).Count
+  $comma = ([regex]::Matches($headerLine, ',')).Count
+  if ($semi -gt $comma) { return ';' }
+  return ','
+}
+
+function Parse-LineToFields([string]$line, [char]$delim) {
+  # Handles quoted values that may contain delimiter.
+  $pattern = "((?<=^|$delim)\s*""(?:[^""]|"""")*""\s*(?=$delim|$))|((?<=^|$delim)[^$delim]*(?=$delim|$))"
+  $m = [regex]::Matches($line, $pattern)
+  $fields = New-Object 'System.Collections.Generic.List[string]'
+  foreach ($x in $m) {
+    $v = $x.Value.Trim()
+    if ($v.StartsWith('"') -and $v.EndsWith('"')) {
+      $v = $v.Substring(1, $v.Length-2) -replace '""','"'
+    }
+    [void]$fields.Add($v)
+  }
+  return $fields.ToArray()
+}
+
+function Find-Col([string[]]$headers, [string[]]$cands) {
+  for ($i=0; $i -lt $headers.Count; $i++) {
+    $h = (Normalize-Whitespace $headers[$i]).ToLowerInvariant()
+    foreach ($c in $cands) {
+      if ($h -eq $c.ToLowerInvariant()) { return $i }
+    }
+  }
+  return -1
+}
+
+function Assay-FamilyKey([string]$assay) {
+  # Normalization aimed at grouping family variants (underscore/space, RUO/IUO, Xpress prefix, etc.)
+  $a = (Normalize-Whitespace $assay).ToLowerInvariant()
+  $a = $a -replace '_',' '          # underscores -> spaces
+  $a = [regex]::Replace($a, '\s+', ' ').Trim()
+
+  # Remove common suffix tags that don't change "family"
+  $a = [regex]::Replace($a, '\b(ruo|iuo)\b', '').Trim()
+
+  # Keep "xpress" as separate bucket? Often you want it same family.
+  # If you want separate: comment out next line.
+  $a = [regex]::Replace($a, '^\s*xpress\s+', '').Trim()
+
+  $a = [regex]::Replace($a, '\s+', ' ').Trim()
+  return $a
+}
+
+function SampleId-Style([string]$sid) {
+  $s = (Normalize-Whitespace $sid)
+  if (-not $s) { return 'EMPTY' }
+  $u = $s.ToUpperInvariant()
+
+  # Very simple patterns: you can extend later
+  if ($u -match '^(NEG|POS)[\W_]' ) { return 'CONTROL_PREFIX_NEG_POS' }
+  if ($u -match '^(NC|PC)[\W_]' )   { return 'CONTROL_PREFIX_NC_PC' }
+  if ($u -match '^\d+$')            { return 'NUMERIC_ONLY' }
+  if ($u -match '^[A-Z0-9]+$')      { return 'ALNUM_NO_SEP' }
+  if ($u -match '[-_]' )            { return 'HAS_SEPARATORS' }
+  return 'OTHER'
+}
+
+function Extract-TestResultTokens([string]$tr) {
+  $u = (Normalize-Whitespace $tr).ToUpperInvariant()
+  if (-not $u) { return @() }
+
+  $tokens = New-Object 'System.Collections.Generic.List[string]'
+  if ($u -match 'NOT\s+DETECTED') { [void]$tokens.Add('NOT DETECTED') }
+  if ($u -match '\bNEGATIVE\b')   { [void]$tokens.Add('NEGATIVE') }
+  if ($u -match '\bDETECTED\b')   { [void]$tokens.Add('DETECTED') }
+  if ($u -match '\bPOSITIVE\b')   { [void]$tokens.Add('POSITIVE') }
+  if ($u -match '\bINVALID\b')    { [void]$tokens.Add('INVALID') }
+  if ($u -match 'NO\s+RESULT')    { [void]$tokens.Add('NO RESULT') }
+  if ($u -match '\bERROR\b')      { [void]$tokens.Add('ERROR') }
+  if ($u -match '\bINDETERMINATE\b') { [void]$tokens.Add('INDETERMINATE') }
+
+  return $tokens.ToArray() | Select-Object -Unique
+}
+
+# ------------------------
+# Interactive inputs
+# ------------------------
+$inputPath = Prompt-Path "Ange sökväg till en Tests Summary.csv ELLER en mapp som innehåller många CSV-filer:"
+$outFolder = Prompt-Path "Ange output-mapp där diagnostik-CSV ska skrivas:"
+Ensure-Folder $outFolder
+
+# Resolve file list
+$files = @()
+if (Test-Path $inputPath -PathType Leaf) {
+  $files = @(Get-Item -LiteralPath $inputPath)
+} elseif (Test-Path $inputPath -PathType Container) {
+  $files = Get-ChildItem -Path $inputPath -Recurse -File |
+    Where-Object { $_.Extension -match '^\.(csv|txt)$' }
+} else {
+  throw "Input path not found: $inputPath"
+}
+
+Write-Host ("Scanning {0} files..." -f $files.Count)
+
+# ------------------------
+# Aggregation structures
+# ------------------------
+# Per family key + per raw assay
+$families = @{}     # key -> object
+$assays   = @{}     # raw assay -> object
+
+# ------------------------
+# Scan files
+# ------------------------
+foreach ($f in $files) {
+  try {
+    $lines = Get-Content -LiteralPath $f.FullName
+    if ($lines.Count -lt 10) { continue }
+    $headerLine = $lines[7]
+    if (-not $headerLine) { continue }
+
+    $delim = Get-DelimiterFromHeaderLine $headerLine
+    $headers = Parse-LineToFields $headerLine $delim
+
+    $idxAssay = Find-Col $headers @('Assay')
+    $idxAssayVer = Find-Col $headers @('Assay Version','AssayVersion')
+    $idxSampleId = Find-Col $headers @('Sample ID','SampleId','Sample ID#','Sample')
+    $idxTestType = Find-Col $headers @('Test Type','TestType')
+    $idxStatus = Find-Col $headers @('Status')
+    $idxTestResult = Find-Col $headers @('Test Result','TestResult')
+
+    if ($idxAssay -lt 0 -or $idxTestResult -lt 0) { continue }
+
+    $maxRow = [Math]::Min($lines.Count-1, 9 + 8000)
+    for ($li=9; $li -le $maxRow; $li++) {
+      $line = $lines[$li]
+      if (-not $line -or $line.Trim().Length -eq 0) { continue }
+
+      $fields = Parse-LineToFields $line $delim
+      if ($fields.Count -le $idxAssay) { continue }
+
+      $assayRaw = Normalize-Whitespace $fields[$idxAssay]
+      if (-not $assayRaw) { continue }
+
+      $assayVer = ''
+      if ($idxAssayVer -ge 0 -and $fields.Count -gt $idxAssayVer) { $assayVer = Normalize-Whitespace $fields[$idxAssayVer] }
+
+      $sampleId = ''
+      if ($idxSampleId -ge 0 -and $fields.Count -gt $idxSampleId) { $sampleId = Normalize-Whitespace $fields[$idxSampleId] }
+
+      $testType = ''
+      if ($idxTestType -ge 0 -and $fields.Count -gt $idxTestType) { $testType = Normalize-Whitespace $fields[$idxTestType] }
+
+      $status = ''
+      if ($idxStatus -ge 0 -and $fields.Count -gt $idxStatus) { $status = Normalize-Whitespace $fields[$idxStatus] }
+
+      $testResult = ''
+      if ($fields.Count -gt $idxTestResult) { $testResult = Normalize-Whitespace $fields[$idxTestResult] }
+
+      $familyKey = Assay-FamilyKey $assayRaw
+
+      # Init family bucket
+      if (-not $families.ContainsKey($familyKey)) {
+        $families[$familyKey] = [pscustomobject]@{
+          FamilyKey = $familyKey
+          RawAssays = New-Object 'System.Collections.Generic.HashSet[string]'
+          AssayVersions = New-Object 'System.Collections.Generic.HashSet[string]'
+          TestTypes = New-Object 'System.Collections.Generic.HashSet[string]'
+          HasSpecimen = $false
+          HasNC1 = $false
+          HasPC = New-Object 'System.Collections.Generic.HashSet[string]'  # PC1..PC5
+          SampleIdStyles = New-Object 'System.Collections.Generic.Dictionary[string,int]'
+          TestResultTokens = New-Object 'System.Collections.Generic.HashSet[string]'
+          ExampleRows = New-Object 'System.Collections.Generic.List[object]'
+          TotalRows = 0
+        }
+      }
+
+      $fb = $families[$familyKey]
+      [void]$fb.RawAssays.Add($assayRaw)
+      if ($assayVer) { [void]$fb.AssayVersions.Add($assayVer) }
+      if ($testType) { [void]$fb.TestTypes.Add($testType) }
+
+      # Detect controls
+      $ttU = $testType.ToUpperInvariant()
+      if ($ttU -eq 'SPECIMEN') { $fb.HasSpecimen = $true }
+      if ($ttU -eq 'NEGATIVE CONTROL 1') { $fb.HasNC1 = $true }
+      if ($ttU -match '^POSITIVE CONTROL\s+[1-5]$') { [void]$fb.HasPC.Add($ttU) }
+
+      # SampleId style stats
+      $style = SampleId-Style $sampleId
+      if (-not $fb.SampleIdStyles.ContainsKey($style)) { $fb.SampleIdStyles[$style] = 0 }
+      $fb.SampleIdStyles[$style] = $fb.SampleIdStyles[$style] + 1
+
+      # Test result tokens
+      foreach ($tok in (Extract-TestResultTokens $testResult)) {
+        [void]$fb.TestResultTokens.Add($tok)
+      }
+
+      # Store a few example rows per family
+      if ($fb.ExampleRows.Count -lt 12) {
+        $fb.ExampleRows.Add([pscustomobject]@{
+          SourceFile = $f.Name
+          Assay = $assayRaw
+          AssayVersion = $assayVer
+          SampleId = $sampleId
+          TestType = $testType
+          Status = $status
+          TestResult = $testResult
+        }) | Out-Null
+      }
+
+      $fb.TotalRows++
+    }
+  } catch {
+    Write-Warning ("Skipping {0}: {1}" -f $f.Name, $_.Exception.Message)
+  }
+}
+
+# ------------------------
+# Export outputs
+# ------------------------
+
+# 1) families_summary.csv
+$familySummary = foreach ($k in ($families.Keys | Sort-Object)) {
+  $fb = $families[$k]
+
+  # Top sampleId style
+  $topStyle = ''
+  if ($fb.SampleIdStyles.Count -gt 0) {
+    $topStyle = ($fb.SampleIdStyles.GetEnumerator() | Sort-Object Value -Descending | Select-Object -First 1).Key
+  }
+
+  $pcList = ($fb.HasPC.ToArray() | Sort-Object) -join ';'
+  $ttCount = $fb.TestTypes.Count
+  $assayCount = $fb.RawAssays.Count
+  $verCount = $fb.AssayVersions.Count
+
+  [pscustomobject]@{
+    FamilyKey = $fb.FamilyKey
+    RawAssayCount = $assayCount
+    AssayVersionCount = $verCount
+    TestTypeCount = $ttCount
+    HasSpecimen = $fb.HasSpecimen
+    HasNegativeControl1 = $fb.HasNC1
+    PositiveControls = $pcList
+    TopSampleIdStyle = $topStyle
+    TestResultTokens = ($fb.TestResultTokens.ToArray() | Sort-Object) -join ';'
+    TotalRows = $fb.TotalRows
+  }
+}
+
+$familySummary | Export-Csv -NoTypeInformation -Encoding UTF8 -Path (Join-Path $outFolder 'families_summary.csv')
+
+# 2) families_raw_assays.csv
+$famRawAssays = foreach ($k in ($families.Keys | Sort-Object)) {
+  $fb = $families[$k]
+  foreach ($a in ($fb.RawAssays.ToArray() | Sort-Object)) {
+    [pscustomobject]@{ FamilyKey=$k; Assay=$a }
+  }
+}
+$famRawAssays | Export-Csv -NoTypeInformation -Encoding UTF8 -Path (Join-Path $outFolder 'families_raw_assays.csv')
+
+# 3) families_testtypes.csv
+$famTestTypes = foreach ($k in ($families.Keys | Sort-Object)) {
+  $fb = $families[$k]
+  foreach ($tt in ($fb.TestTypes.ToArray() | Sort-Object)) {
+    [pscustomobject]@{ FamilyKey=$k; TestType=$tt }
+  }
+}
+$famTestTypes | Export-Csv -NoTypeInformation -Encoding UTF8 -Path (Join-Path $outFolder 'families_testtypes.csv')
+
+# 4) families_assayversions.csv
+$famVers = foreach ($k in ($families.Keys | Sort-Object)) {
+  $fb = $families[$k]
+  foreach ($v in ($fb.AssayVersions.ToArray() | Sort-Object)) {
+    [pscustomobject]@{ FamilyKey=$k; AssayVersion=$v }
+  }
+}
+$famVers | Export-Csv -NoTypeInformation -Encoding UTF8 -Path (Join-Path $outFolder 'families_assayversions.csv')
+
+# 5) families_examples.csv
+$famExamples = foreach ($k in ($families.Keys | Sort-Object)) {
+  $fb = $families[$k]
+  foreach ($ex in $fb.ExampleRows) {
+    [pscustomobject]@{
+      FamilyKey = $k
+      SourceFile = $ex.SourceFile
+      Assay = $ex.Assay
+      AssayVersion = $ex.AssayVersion
+      SampleId = $ex.SampleId
+      TestType = $ex.TestType
+      Status = $ex.Status
+      TestResult = $ex.TestResult
+    }
+  }
+}
+$famExamples | Export-Csv -NoTypeInformation -Encoding UTF8 -Path (Join-Path $outFolder 'families_examples.csv')
+
+Write-Host "Done. Files written to: $outFolder"
+Write-Host " - families_summary.csv"
+Write-Host " - families_raw_assays.csv"
+Write-Host " - families_testtypes.csv"
+Write-Host " - families_assayversions.csv"
+Write-Host " - families_examples.csv"
+
+
+⸻
+
+Vad den svarar på i din fråga
+
+“Vilka assays har Negative Control 1 / Positive Control 1–5 vs bara Specimen?”
+
+Det blir direkt synligt i families_summary.csv:
+	•	HasSpecimen
+	•	HasNegativeControl1
+	•	PositiveControls (lista PC1–PC5 som faktiskt förekom)
+
+“Hur Sample ID namnges”
+
+Du får två saker:
+	•	TopSampleIdStyle (en grov klassning)
+	•	exempelrader per familj i families_examples.csv där du kan se verkliga SampleIds
+
+“Test Result”
+
+Du får:
+	•	TestResultTokens (DETECTED/NOT DETECTED/INVALID/NO RESULT/ERROR/INDETERMINATE) per familj
+	•	samt exempelrader
+
+⸻
+
+Vad du skickar tillbaka till mig
+
+Skicka gärna dessa två (det räcker långt):
+	•	families_summary.csv
+	•	families_examples.csv
+
+Om du vill att jag ska bygga perfekta wildcard-rader till 08:
+	•	skicka även families_raw_assays.csv
+
+⸻
+
+Om du vill kan jag göra snutten ännu mer “wizard”-lik:
+	•	om du bara matar in mapp + output så skriver den även en förslag-fil 08_AssayObservedCallRules_suggested.csv baserat på familjerna.
