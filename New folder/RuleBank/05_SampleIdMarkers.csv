@@ -1,0 +1,6 @@
+﻿AssayPattern,MarkerType,Marker,SampleTokenIndex,Enabled,Note
+*,DelaminationCodeRegex,"^D\d{1,2}[A-Z]?$",-1,TRUE,"Ignore trailing delamination token (e.g., _D2B, _D05, _D11) when evaluating suffix"
+*,DelaminationSeparator,_,-1,TRUE,Delimiter between base SampleID and delamination token
+*,SuffixChars,X|\\+,-1,TRUE,Valid suffix characters on Base-SampleID (X or +)
+*,SampleTypeCodeTokenIndex,2,2,TRUE,"SampleTypeCode is token index 2 (0..5) in Sample ID split by ""_"""
+*,SampleNumberTokenIndex,3,3,TRUE,"SampleNumber(+suffix) is token index 3 in Sample ID split by ""_"""
