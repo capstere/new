@@ -1,0 +1,2 @@
+AssayPattern,AssayMatchType,Enabled,Priority,PosRegex,NegRegex,ErrRegex,PosWins,Note
+*,WILDCARD,True,100,(?i)\b(DETECTED|POSITIVE)\b,(?i)\b(NOT\s*DETECTED|NEGATIVE)\b,(?i)\b(ERROR|NO\s*RESULT)\b,True,"Generic non-MTB fallback: DETECTED/POSITIVE => POS, NOT DETECTED/NEGATIVE => NEG. Used only when 01_ResultCallPatterns has no match."

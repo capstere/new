@@ -1,0 +1,515 @@
+--- a/Modules/Config.ps1
++++ b/Modules/Config.ps1
+@@ -65,6 +65,7 @@
+     EnableShadowCompare = $true        # Log diff between legacy and rules when EnableRuleEngine is on
+     EnableRuleEngineDebugSheet = $true        # Add RuleEngine_Debug worksheet to output (safe, appended)
+     RuleEngineDebugIncludeAllRows = $false # When true: write ALL rows in RuleEngine_Debug (legacy behavior)
++    RuleEngineDebugView = \'User\'      # User: compact Swedish layout, Dev: verbose/diagnostic
+     RuleBankDir         = (Join-Path $ScriptRoot 'RuleBank')
+     CsvStreamingThresholdMB = 25   # Byt till t.ex. 10 om du vill streama tidigare
+     CsvPath       = ''           # Sökväg till CSV-fil
+--- a/Main.ps1
++++ b/Main.ps1
+@@ -3167,7 +3167,13 @@
+                     if ($script:RuleEngineShadow -and $script:RuleEngineShadow.Rows -and $script:RuleEngineShadow.Rows.Count -gt 0) {
+                         Gui-Log "🧠 Skriver RuleEngine_Debug (shadow)..." 'Info'
+                         $includeAll = (Test-ConfigFlag $Config 'RuleEngineDebugIncludeAllRows' $false)
+-                        [void](Write-RuleEngineDebugSheet -Pkg $pkgOut -RuleEngineResult $script:RuleEngineShadow -IncludeAllRows $includeAll)
++                        $viewMode = 'User'
++                        try {
++                            if ($Config -is [hashtable] -and $Config.ContainsKey('RuleEngineDebugView')) { $viewMode = (($Config['RuleEngineDebugView'] + '')).Trim() }
++                            elseif ($Config.PSObject.Properties.Name -contains 'RuleEngineDebugView') { $viewMode = (($Config.RuleEngineDebugView + '')).Trim() }
++                        } catch {}
++                        if (-not $viewMode) { $viewMode = 'User' }
++                        [void](Write-RuleEngineDebugSheet -Pkg $pkgOut -RuleEngineResult $script:RuleEngineShadow -IncludeAllRows $includeAll -ViewMode $viewMode)
+                     } else {
+                         Gui-Log "⚠️ RuleEngine_Debug hoppar över: inget RuleEngine-resultat." 'Warn'
+                     }
+--- a/Modules/RuleEngine.ps1
++++ b/Modules/RuleEngine.ps1
+@@ -32,6 +32,7 @@
+         SampleIdMarkers = @()
+         ParityCheckConfig = @()
+         SampleNumberRules = @()
++        AssayObservedCallRules = @()
+     }
+ 
+     if (-not (Test-Path -LiteralPath $RuleBankDir)) { return [pscustomobject]$rb }
+@@ -44,6 +45,7 @@
+         SampleIdMarkers         = '05_SampleIdMarkers.csv'
+         ParityCheckConfig       = '06_ParityCheckConfig.csv'
+         SampleNumberRules       = '07_SampleNumberRules.csv'
++        AssayObservedCallRules = '08_AssayObservedCallRules.csv'
+     }
+ 
+     foreach ($k in $map.Keys) {
+@@ -57,6 +59,7 @@
+     try { $rb.ParityCheckConfig = @($rb.ParityCheckConfig | Sort-Object { [int]($_.Priority) } -Descending) } catch {}
+     try { $rb.SampleIdMarkers = @($rb.SampleIdMarkers | Sort-Object { [int]($_.Priority) } -Descending) } catch {}
+     try { $rb.SampleNumberRules = @($rb.SampleNumberRules | Sort-Object { [int]($_.Priority) } -Descending) } catch {}
++    try { $rb.AssayObservedCallRules = @($rb.AssayObservedCallRules | Sort-Object { [int]($_.Priority) } -Descending) } catch {}
+ 
+     return [pscustomobject]$rb
+ }
+@@ -82,12 +85,36 @@
+     return ($s -in @('TRUE','1','YES','Y'))
+ }
+ 
++function Normalize-AssayForMatch {
++    param([Parameter(Mandatory=$false)][string]$Text)
++    $t = (($Text + '')).Trim()
++    if (-not $t) { return '' }
++    $t = $t.Replace('_',' ')
++    $t = [regex]::Replace($t, '\s+', ' ').Trim()
++    return $t
++}
++
++function Get-AssayMatchVariants {
++    param([Parameter(Mandatory=$false)][string]$Text)
++    $v = New-Object System.Collections.Generic.List[string]
++    $o = (($Text + '')).Trim()
++    if ($o) { $v.Add($o) }
++    $n = Normalize-AssayForMatch -Text $o
++    if ($n -and -not ($v.Contains($n))) { $v.Add($n) }
++    $u = ($n.Replace(' ','_'))
++    if ($u -and -not ($v.Contains($u))) { $v.Add($u) }
++    return $v.ToArray()
++}
++
+ function Test-AssayMatch {
+     <#
+       Supports:
+       - empty / '*' => match all
+       - wildcard patterns (contains '*' or '?') via -like
+       - otherwise case-insensitive equals
++
++      Enhanced (backwards compatible):
++      - tries raw + normalized variants (underscore vs space, whitespace collapse)
+     #>
+     param(
+         [Parameter(Mandatory)][string]$RuleAssay,
+@@ -96,12 +123,26 @@
+     $ra = ($RuleAssay + '').Trim()
+     if (-not $ra -or $ra -eq '*') { return $true }
+ 
+-    $row = ($RowAssay + '').Trim()
++    $rowVars  = Get-AssayMatchVariants -Text $RowAssay
++    $ruleVars = Get-AssayMatchVariants -Text $ra
++
+     if ($ra -like '*[*?]*') {
+-        return ($row -like $ra)
+-    }
+-    return ($ra -ieq $row)
+-}
++        foreach ($rv in $rowVars) {
++            foreach ($pv in $ruleVars) {
++                if ($rv -like $pv) { return $true }
++            }
++        }
++        return $false
++    }
++
++    foreach ($rv in $rowVars) {
++        foreach ($pv in $ruleVars) {
++            if ($rv -ieq $pv) { return $true }
++        }
++    }
++    return $false
++}
++
+ 
+ function Match-Text {
+     param(
+@@ -143,7 +184,8 @@
+ function Get-ObservedCallDetailed {
+     param(
+         [Parameter(Mandatory)][object]$Row,
+-        [Parameter(Mandatory)][object[]]$Patterns
++        [Parameter(Mandatory)][object[]]$Patterns,
++        [Parameter(Mandatory=$false)][object[]]$AssayObservedCallRules = @()
+     )
+ 
+     $status = (Get-RowField -Row $Row -FieldName 'Status')
+@@ -195,6 +237,56 @@
+             }
+         }
+     }
++
++    
++    # 08_AssayObservedCallRules fallback (non-MTB only), used ONLY when 01 patterns did not match.
++    try {
++        $assStr = ($assay + '')
++        if ($assStr -notmatch '(?i)\bMTB\b' -and $AssayObservedCallRules -and $AssayObservedCallRules.Count -gt 0) {
++
++            $best = $null
++            foreach ($rr in $AssayObservedCallRules) {
++                if (-not (Test-RuleEnabled $rr)) { continue }
++                $ap = ((Get-RowField -Row $rr -FieldName 'AssayPattern') + '').Trim()
++                if (-not $ap) { $ap = '*' }
++                $amt = ((Get-RowField -Row $rr -FieldName 'AssayMatchType') + '').Trim().ToUpperInvariant()
++                if ($amt -eq 'REGEX') {
++                    $rowA = Normalize-AssayForMatch -Text $assStr
++                    if ($rowA -match $ap) { $best = $rr; break }
++                } else {
++                    if (Test-AssayMatch -RuleAssay $ap -RowAssay $assStr) { $best = $rr; break }
++                }
++            }
++
++            if ($best) {
++                $posRx = ((Get-RowField -Row $best -FieldName 'PosRegex') + '').Trim()
++                $negRx = ((Get-RowField -Row $best -FieldName 'NegRegex') + '').Trim()
++                $errRx = ((Get-RowField -Row $best -FieldName 'ErrRegex') + '').Trim()
++                $posWinsRaw = ((Get-RowField -Row $best -FieldName 'PosWins') + '').Trim().ToUpperInvariant()
++                $posWins = $true
++                if ($posWinsRaw -in @('FALSE','0','NO','N')) { $posWins = $false }
++
++                $note = ((Get-RowField -Row $best -FieldName 'Note') + '').Trim()
++                if (-not $note) { $note = '08 fallback' }
++
++                if ($errRx -and ($tr -match $errRx)) {
++                    return [pscustomobject]@{ Call='ERROR'; Reason=('08 fallback: ' + $note) }
++                }
++
++                $posHit = $false
++                $negHit = $false
++                if ($posRx -and ($tr -match $posRx)) { $posHit = $true }
++                if ($negRx -and ($tr -match $negRx)) { $negHit = $true }
++
++                if ($posHit -and $negHit) {
++                    if ($posWins) { return [pscustomobject]@{ Call='POS'; Reason=('08 fallback: ' + $note + ' (pos wins)') } }
++                    else { return [pscustomobject]@{ Call='NEG'; Reason=('08 fallback: ' + $note + ' (neg wins)') } }
++                }
++                if ($posHit) { return [pscustomobject]@{ Call='POS'; Reason=('08 fallback: ' + $note) } }
++                if ($negHit) { return [pscustomobject]@{ Call='NEG'; Reason=('08 fallback: ' + $note) } }
++            }
++        }
++    } catch { }
+ 
+     return [pscustomobject]@{ Call='UNKNOWN'; Reason='No pattern matched' }
+ }
+@@ -295,6 +387,8 @@
+     )
+ 
+     $errTxt = (Get-RowField -Row $Row -FieldName 'Error')
++    $isDelamination = $false
++    try { if (($DelamPattern + '').Trim() -and (($errTxt + '') -match $DelamPattern)) { $isDelamination = $true } } catch { $isDelamination = $false }
+     $mpTxt  = (Get-RowField -Row $Row -FieldName 'Max Pressure (PSI)')
+ 
+     $code = ''
+@@ -358,6 +452,7 @@
+         GeneratesRetest = $retest
+         MaxPressure     = $pressure
+         PressureFlag    = $pressureFlag
++        IsDelamination = $isDelamination
+     }
+ }
+ 
+@@ -757,7 +852,7 @@
+ 
+         foreach ($row in $group) {
+             try {
+-                $obsD = Get-ObservedCallDetailed -Row $row -Patterns $RuleBank.ResultCallPatterns
++                $obsD = Get-ObservedCallDetailed -Row $row -Patterns $RuleBank.ResultCallPatterns -AssayObservedCallRules $RuleBank.AssayObservedCallRules
+                 $expD = Get-ExpectedCallDetailed -Row $row -Rules $RuleBank.SampleExpectationRules
+ 
+                 $sid = (Get-RowField -Row $row -FieldName 'Sample ID')
+@@ -791,6 +886,19 @@
+                 if (($sid + '').Trim()) {
+                     $tokInfo = Get-SampleTokenAndBase -SampleId ($sid + '') -TokenIndex $parCfg.TokenIndex -DelamPattern $delamPattern -ValidSuffixRegex $validSuffix -XChar $parCfg.XChar -PlusChar $parCfg.PlusChar
+                 }
++
++                $isDelamSampleId = $false
++                try {
++                    $st = (($tokInfo.SampleToken + '')).Trim()
++                    $bt = (($tokInfo.BaseToken + '')).Trim()
++                    if ($st -and $bt -and ($st -ne $bt)) { $isDelamSampleId = $true }
++                } catch { $isDelamSampleId = $false }
++
++                $isReplacementReplicate = $false
++                try {
++                    if ((($tokInfo.BaseToken + '')).Trim() -match '(?i)^\d{1,4}A{1,3}(?:X|\+)$') { $isReplacementReplicate = $true }
++                } catch { $isReplacementReplicate = $false }
++
+ 
+                 $expectedSuffix = ''
+                 $suffixSource = ''
+@@ -909,6 +1017,8 @@
+                     ModuleSN         = (Get-RowField -Row $row -FieldName 'Module S/N')
+                     StartTime        = (Get-RowField -Row $row -FieldName 'Start Time')
+                     RuleFlags        = ''
++                    IsDelamination  = ($errInfo.IsDelamination -or $isDelamSampleId)
++                    IsReplacementReplicate = $isReplacementReplicate
+                 })
+ 
+             } catch {
+@@ -968,11 +1078,19 @@
+     }
+ 
+     # Suffix/sample number quick flags (so exception-only debug includes these)
+-    foreach ($r in $results) {
++    if ($distinctAssays.Count -eq 1) {
++        foreach ($r in $results) {
+         $sc = ((($r.SuffixCheck + '')).Trim().ToUpperInvariant())
+         if ($sc -and $sc -ne 'OK') { _Append-RuleFlag -row $r -flag ('SUFFIX_' + $sc) }
+         $snok = ((($r.SampleNumOK + '')).Trim().ToUpperInvariant())
+         if ($snok -eq 'NO') { _Append-RuleFlag -row $r -flag 'SAMPLENUM_BAD' }
++        }
++    } else {
++        # Multi-assay file: suppress SUFFIX_* noise; rely on summary warning "Varning: flera assay" instead.
++        foreach ($r in $results) {
++            $snok = ((($r.SampleNumOK + '')).Trim().ToUpperInvariant())
++            if ($snok -eq 'NO') { _Append-RuleFlag -row $r -flag 'SAMPLENUM_BAD' }
++        }
+     }
+ 
+     # Module hotspot: >=3 ERROR rows on same Module S/N
+@@ -996,6 +1114,8 @@
+         DuplicateSampleIdCount = ($dupSample | ForEach-Object { $_.Name } | Select-Object -Unique).Count
+         DuplicateCartridgeSnCount = ($dupCart | ForEach-Object { $_.Name } | Select-Object -Unique).Count
+         HotModuleCount = $hotModules.Count
++        DelaminationCount = 0
++        ReplacementReplicateCount = 0
+     }
+     # ---------------------------------------------------------------
+     $summary = [pscustomobject]@{
+@@ -1003,6 +1123,10 @@
+         ObservedCounts = @{}
+         DeviationCounts = @{}
+         RetestYes = 0
++        MinorFunctionalError = 0
++        InstrumentError = 0
++        Delamination = 0
++        ReplacementReplicates = 0
+     }
+ 
+     foreach ($r in $results) {
+@@ -1014,7 +1138,29 @@
+ 
+         $rt = ($r.GeneratesRetest + '').Trim().ToUpperInvariant()
+         if ($rt -in @('YES','Y','TRUE','1')) { $summary.RetestYes++ }
+-    }
++
++        # Minor vs Instrument ERROR split
++        $obs = (($r.ObservedCall + '')).Trim().ToUpperInvariant()
++        if ($obs -eq 'ERROR') {
++            $isMinor = $false
++            $ec = (($r.ErrorCode + '')).Trim()
++            if ($ec -and $errLut -and $errLut.Codes.ContainsKey($ec)) { $isMinor = $true }
++
++            $ass = (($r.Assay + '') + '')
++            $tr2 = (($r.TestResult + '') + '')
++            if (-not $isMinor -and ($ass -match '(?i)\bMTB\b') -and ($tr2 -match '(?i)\bINDETERMINATE\b')) { $isMinor = $true }
++
++            if ($isMinor) { $summary.MinorFunctionalError++ } else { $summary.InstrumentError++ }
++        }
++
++        # Delamination / Replacement replicate counts (from Sample ID markers + error)
++        try { if ([bool]$r.IsDelamination) { $summary.Delamination++ } } catch {}
++        try { if ([bool]$r.IsReplacementReplicate) { $summary.ReplacementReplicates++ } } catch {}
++
++    }
++
++    try { $qc.DelaminationCount = $summary.Delamination } catch {}
++    try { $qc.ReplacementReplicateCount = $summary.ReplacementReplicates } catch {}
+ 
+     $top = @($results | Where-Object { $_.Deviation -in @('FP','FN','ERROR','MISMATCH') } | Select-Object -First 50)
+ 
+@@ -1025,7 +1171,8 @@
+     param(
+         [Parameter(Mandatory)][object]$Pkg,
+         [Parameter(Mandatory)][pscustomobject]$RuleEngineResult,
+-        [Parameter(Mandatory=$false)][bool]$IncludeAllRows = $false
++        [Parameter(Mandatory=$false)][bool]$IncludeAllRows = $false,
++        [Parameter(Mandatory=$false)][string]$ViewMode = 'User'
+     )
+ 
+     try {
+@@ -1035,27 +1182,74 @@
+ 
+     $ws = $Pkg.Workbook.Worksheets.Add('RuleEngine_Debug')
+ 
+-    # Column layout inspired by RuleEngine_Debug_FUTURE.xlsx (Swedish, fewer columns, more QC-friendly)
+-    $headers = @(
+-        'Prov-ID',
+-        'Felkod',
+-        'Avvikelse',
+-        'Flaggor',
+-        'Förväntat suffix',
+-        'Suffixkontroll',
+-        'Kassett S/N',
+-        'Modul S/N',
+-        'Starttid',
+-        'Testtyp',
+-        'Förväntad testtyp',
+-        'Observerat (varför)',
+-        'Status',
+-        'Felnamn',
+-        'Omkörning',
+-        'Maxtryck (PSI)',
+-        'Testresultat',
+-        'Feltext'
+-    )
++    # Column layout (Swedish compact for User, verbose for Dev)
++    $vm = (($ViewMode + '')).Trim()
++    if (-not $vm) { $vm = 'User' }
++    $isDev = ($vm -match '(?i)^dev$')
++
++    $colSpecUser = @(
++        @{ Header='Prov-ID';              Get={ param($r) ($r.SampleId + '') } },
++        @{ Header='Felkod';               Get={ param($r) ($r.ErrorCode + '') } },
++        @{ Header='Avvikelse';            Get={ param($r) (_SvDeviation ($r.Deviation + '')) } },
++        @{ Header='Flaggor';              Get={ param($r) ($r.RuleFlags + '') } },
++        @{ Header='Förväntat suffix';     Get={ param($r) ($r.ExpectedSuffix + '') } },
++        @{ Header='Suffixkontroll';       Get={ param($r) (_SvSuffixCheck ($r.SuffixCheck + '')) } },
++        @{ Header='Kassett S/N';          Get={ param($r) ($r.CartridgeSN + '') } },
++        @{ Header='Modul S/N';            Get={ param($r) ($r.ModuleSN + '') } },
++        @{ Header='Starttid';             Get={ param($r) ($r.StartTime + '') } },
++        @{ Header='Testtyp';              Get={ param($r) ($r.TestType + '') } },
++        @{ Header='Förväntad testtyp';    Get={ param($r) ($r.ExpectedTestType + '') } },
++        @{ Header='Observerat (varför)';  Get={ param($r) ($r.ObservedWhy + '') } },
++        @{ Header='Status';               Get={ param($r) ($r.Status + '') } },
++        @{ Header='Felnamn';              Get={ param($r) ($r.ErrorName + '') } },
++        @{ Header='Omkörning';            Get={ param($r) ($r.GeneratesRetest + '') } },
++        @{ Header='Maxtryck (PSI)';       Get={ param($r) (if ($r.MaxPressure) { $r.MaxPressure } else { '' }) } },
++        @{ Header='Testresultat';         Get={ param($r) ($r.TestResult + '') } },
++        @{ Header='Feltext';              Get={ param($r) ($r.ErrorText + '') } }
++    )
++
++    $colSpecDev = @(
++        @{ Header='Sample ID';            Get={ param($r) ($r.SampleId + '') } },
++        @{ Header='Assay';                Get={ param($r) ($r.Assay + '') } },
++        @{ Header='Assay Version';        Get={ param($r) ($r.AssayVersion + '') } },
++        @{ Header='Reagent Lot ID';       Get={ param($r) ($r.ReagentLotId + '') } },
++        @{ Header='Test Type';            Get={ param($r) ($r.TestType + '') } },
++        @{ Header='Expected Test Type';   Get={ param($r) ($r.ExpectedTestType + '') } },
++        @{ Header='Expected Call';        Get={ param($r) ($r.ExpectedCall + '') } },
++        @{ Header='Expected Source';      Get={ param($r) ($r.ExpectedSource + '') } },
++        @{ Header='Expected Why';         Get={ param($r) ($r.ExpectedWhy + '') } },
++        @{ Header='Observed Call';        Get={ param($r) ($r.ObservedCall + '') } },
++        @{ Header='Observed Why';         Get={ param($r) ($r.ObservedWhy + '') } },
++        @{ Header='Deviation';            Get={ param($r) ($r.Deviation + '') } },
++        @{ Header='RuleFlags';            Get={ param($r) ($r.RuleFlags + '') } },
++        @{ Header='ErrorCode';            Get={ param($r) ($r.ErrorCode + '') } },
++        @{ Header='ErrorName';            Get={ param($r) ($r.ErrorName + '') } },
++        @{ Header='GeneratesRetest';      Get={ param($r) ($r.GeneratesRetest + '') } },
++        @{ Header='MaxPressure';          Get={ param($r) (if ($r.MaxPressure) { $r.MaxPressure } else { '' }) } },
++        @{ Header='PressureFlag';         Get={ param($r) (try { [bool]$r.PressureFlag } catch { $false }) } },
++        @{ Header='IsDelamination';       Get={ param($r) (try { [bool]$r.IsDelamination } catch { $false }) } },
++        @{ Header='IsReplacementRep';     Get={ param($r) (try { [bool]$r.IsReplacementReplicate } catch { $false }) } },
++        @{ Header='Cartridge S/N';        Get={ param($r) ($r.CartridgeSN + '') } },
++        @{ Header='Module S/N';           Get={ param($r) ($r.ModuleSN + '') } },
++        @{ Header='Start Time';           Get={ param($r) ($r.StartTime + '') } },
++        @{ Header='Status';               Get={ param($r) ($r.Status + '') } },
++        @{ Header='Test Result';          Get={ param($r) ($r.TestResult + '') } },
++        @{ Header='Error Text';           Get={ param($r) ($r.ErrorText + '') } },
++        @{ Header='ControlCode';          Get={ param($r) ($r.ControlCode + '') } },
++        @{ Header='SampleToken';          Get={ param($r) ($r.SampleToken + '') } },
++        @{ Header='BaseToken';            Get={ param($r) ($r.BaseToken + '') } },
++        @{ Header='ActualSuffix';         Get={ param($r) ($r.ActualSuffix + '') } },
++        @{ Header='ExpectedSuffix';       Get={ param($r) ($r.ExpectedSuffix + '') } },
++        @{ Header='SuffixCheck';          Get={ param($r) ($r.SuffixCheck + '') } },
++        @{ Header='SuffixSource';         Get={ param($r) ($r.SuffixSource + '') } },
++        @{ Header='SampleNum';            Get={ param($r) ($r.SampleNum + '') } },
++        @{ Header='SampleNumOK';          Get={ param($r) ($r.SampleNumOK + '') } },
++        @{ Header='SampleNumWhy';         Get={ param($r) ($r.SampleNumWhy + '') } }
++    )
++
++    $colSpec = if ($isDev) { $colSpecDev } else { $colSpecUser }
++    $headers = @($colSpec | ForEach-Object { $_.Header })
++
+ 
+     # -------------------- Summary (always) --------------------
+     $row = 1
+@@ -1116,6 +1310,11 @@
+         }
+     }
+ 
++    _KV -r $row -k 'Minor Functional Error' -v (try { $sum.MinorFunctionalError } catch { 0 }); $row++
++    _KV -r $row -k 'Instrument Error' -v (try { $sum.InstrumentError } catch { 0 }); $row++
++    _KV -r $row -k 'Delaminering' -v (try { $sum.Delamination } catch { 0 }); $row++
++    _KV -r $row -k 'Ersättningsreplikat (A/AA/AAA)' -v (try { $sum.ReplacementReplicates } catch { 0 }); $row++
++
+     _KV -r $row -k 'Omkörning (YES)' -v $sum.RetestYes; $row++
+ 
+     if ($qc) {
+@@ -1212,30 +1411,12 @@
+     }
+ 
+     foreach ($r in $rowsToWrite) {
+-        $ws.Cells.Item($rOut,1).Value  = ($r.SampleId + '')
+-        $ws.Cells.Item($rOut,2).Value  = ($r.ErrorCode + '')
+-        $ws.Cells.Item($rOut,3).Value  = (_SvDeviation ($r.Deviation + ''))
+-        $ws.Cells.Item($rOut,4).Value  = ($r.RuleFlags + '')
+-        $ws.Cells.Item($rOut,5).Value  = ($r.ExpectedSuffix + '')
+-        $ws.Cells.Item($rOut,6).Value  = (_SvSuffixCheck ($r.SuffixCheck + ''))
+-        $ws.Cells.Item($rOut,7).Value  = ($r.CartridgeSN + '')
+-        $ws.Cells.Item($rOut,8).Value  = ($r.ModuleSN + '')
+-        $ws.Cells.Item($rOut,9).Value  = ($r.StartTime + '')
+-        $ws.Cells.Item($rOut,10).Value = ($r.TestType + '')
+-        $ws.Cells.Item($rOut,11).Value = ($r.ExpectedTestType + '')
+-        $ws.Cells.Item($rOut,12).Value = ($r.ObservedWhy + '')
+-        $ws.Cells.Item($rOut,13).Value = ($r.Status + '')
+-        $ws.Cells.Item($rOut,14).Value = ($r.ErrorName + '')
+-
+-        $rt = (($r.GeneratesRetest + '')).Trim().ToUpperInvariant()
+-        if ($rt -in @('YES','Y','TRUE','1')) { $ws.Cells.Item($rOut,15).Value = 'Ja' }
+-        elseif ($rt) { $ws.Cells.Item($rOut,15).Value = 'Nej' }
+-        else { $ws.Cells.Item($rOut,15).Value = '' }
+-
+-        $ws.Cells.Item($rOut,16).Value = $(if ($null -ne $r.MaxPressure) { $r.MaxPressure } else { '' })
+-        $ws.Cells.Item($rOut,17).Value = ($r.TestResult + '')
+-        $ws.Cells.Item($rOut,18).Value = ($r.ErrorText + '')
+-
++        for ($c=1; $c -le $colSpec.Count; $c++) {
++            $spec = $colSpec[$c-1]
++            $val = ''
++            try { $val = & $spec.Get $r } catch { $val = '' }
++            $ws.Cells.Item($rOut,$c).Value = $val
++        }
+         $rOut++
+     }
+ 
+--- a/RuleBank/06_ParityCheckConfig.csv
++++ b/RuleBank/06_ParityCheckConfig.csv
+@@ -1,6 +1,6 @@
+ AssayPattern,Enabled,CartridgeField,SampleTokenIndex,SuffixX,SuffixPlus,DelaminationMarkerType,MinValidCartridgeSNPercent,Note,Priority
+-Xpert MTB-RIF Assay G4,TRUE,Cartridge S/N,3,X,+,DelaminationCodeRegex,80,Use parity (odd/even) to predict expected suffix for MTB-family; fallback to majority if too many missing/invalid S/N,9000
+-Xpert MTB-RIF JP IVD,TRUE,Cartridge S/N,3,X,+,DelaminationCodeRegex,80,Use parity (odd/even) to predict expected suffix for MTB-family; fallback to majority if too many missing/invalid S/N,9000
+-Xpert MTB-RIF Ultra,TRUE,Cartridge S/N,3,X,+,DelaminationCodeRegex,80,Use parity (odd/even) to predict expected suffix for MTB-family; fallback to majority if too many missing/invalid S/N,9000
+-Xpert MTB-XDR,TRUE,Cartridge S/N,3,X,+,DelaminationCodeRegex,80,Use parity (odd/even) to predict expected suffix for MTB-family; fallback to majority if too many missing/invalid S/N,9000
+-*,TRUE,Cartridge S/N,3,X,+,DelaminationCodeRegex,80,(Template) Enable per-assay when X/+ naming is used and Cartridge S/N parity is meaningful,100
++Xpert MTB-RIF Assay G4,True,Cartridge S/N,3,X,+,DelaminationCodeRegex,80,Use parity (odd/even) to predict expected suffix for MTB-family; fallback to majority if too many missing/invalid S/N,9000
++Xpert MTB-RIF JP IVD,True,Cartridge S/N,3,X,+,DelaminationCodeRegex,80,Use parity (odd/even) to predict expected suffix for MTB-family; fallback to majority if too many missing/invalid S/N,9000
++Xpert MTB-RIF Ultra,True,Cartridge S/N,3,X,+,DelaminationCodeRegex,80,Use parity (odd/even) to predict expected suffix for MTB-family; fallback to majority if too many missing/invalid S/N,9000
++Xpert MTB-XDR,True,Cartridge S/N,3,X,+,DelaminationCodeRegex,80,Use parity (odd/even) to predict expected suffix for MTB-family; fallback to majority if too many missing/invalid S/N,9000
++*,False,Cartridge S/N,3,X,+,DelaminationCodeRegex,80,(Template) Enable per-assay when X/+ naming is used and Cartridge S/N parity is meaningful,100
+--- a/RuleBank/README.md
++++ b/RuleBank/README.md
+@@ -15,3 +15,22 @@
+ 3. Lägg till markers i 05_SampleIdMarkers.csv (om behövs)
+ 4. Lägg till parity-config i 06_ParityCheckConfig.csv (om behövs)
+ 5. Lägg till sample-number-regler i 07_SampleNumberRules.csv
++
++
++## 08_AssayObservedCallRules.csv (NEW)
++
++Purpose: data-driven fallback for mapping raw **Test Result** text to ObservedCall (POS/NEG/ERROR) for **non-MTB assays**, used **only** when 01_ResultCallPatterns does not match.
++
++Schema:
++- AssayPattern (wildcard or regex if AssayMatchType=REGEX)
++- AssayMatchType: WILDCARD (default) or REGEX
++- PosRegex / NegRegex / ErrRegex (regex evaluated against Test Result)
++- PosWins (TRUE/FALSE) when both PosRegex and NegRegex match (multi-target strings)
++- Enabled, Priority, Note
++
++Notes:
++- MTB assays are excluded in code (handled by MTB-specific logic / patterns).
++
++## 06_ParityCheckConfig.csv change
++
++The template row with AssayPattern="*" is now **Enabled = False** to avoid accidental SUFFIX checking on assays that do not follow X/+ naming. Enable per-assay rows instead.
+--- a/RuleBank/08_AssayObservedCallRules.csv
++++ b/RuleBank/08_AssayObservedCallRules.csv
+@@ -0,0 +1,2 @@
++AssayPattern,AssayMatchType,Enabled,Priority,PosRegex,NegRegex,ErrRegex,PosWins,Note
++*,WILDCARD,True,100,(?i)\b(DETECTED|POSITIVE)\b,(?i)\b(NOT\s*DETECTED|NEGATIVE)\b,(?i)\b(ERROR|NO\s*RESULT)\b,True,"Generic non-MTB fallback: DETECTED/POSITIVE => POS, NOT DETECTED/NEGATIVE => NEG. Used only when 01_ResultCallPatterns has no match."
