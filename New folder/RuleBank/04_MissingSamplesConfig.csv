@@ -1,2 +1,0 @@
-﻿AssayPattern,BagMin,BagMax,Bag0SampleMin,Bag0SampleMax,OtherBagSampleMin,OtherBagSampleMax,Token_SampleID_SplitIndex,SampleNumberRegex,SampleNumberPad,Notes,Enabled,Priority
-*,0,10,1,10,1,20,1,\d+,2,Default bag/sample expectation (Bag0=1..10; Bags1-10=1..20),FALSE,100

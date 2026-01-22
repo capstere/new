@@ -1,6 +1,0 @@
-﻿AssayPattern,Enabled,CartridgeField,SampleTokenIndex,SuffixX,SuffixPlus,DelaminationMarkerType,MinValidCartridgeSNPercent,Note,Priority
-Xpert MTB-RIF Assay G4,TRUE,Cartridge S/N,3,X,+,DelaminationCodeRegex,80,Use parity (odd/even) to predict expected suffix for MTB-family; fallback to majority if too many missing/invalid S/N,9000
-Xpert MTB-RIF JP IVD,TRUE,Cartridge S/N,3,X,+,DelaminationCodeRegex,80,Use parity (odd/even) to predict expected suffix for MTB-family; fallback to majority if too many missing/invalid S/N,9000
-Xpert MTB-RIF Ultra,TRUE,Cartridge S/N,3,X,+,DelaminationCodeRegex,80,Use parity (odd/even) to predict expected suffix for MTB-family; fallback to majority if too many missing/invalid S/N,9000
-Xpert MTB-XDR,TRUE,Cartridge S/N,3,X,+,DelaminationCodeRegex,80,Use parity (odd/even) to predict expected suffix for MTB-family; fallback to majority if too many missing/invalid S/N,9000
-*,TRUE,Cartridge S/N,3,X,+,DelaminationCodeRegex,80,(Template) Enable per-assay when X/+ naming is used and Cartridge S/N parity is meaningful,100

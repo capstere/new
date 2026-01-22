@@ -1,5 +1,0 @@
-﻿Assay,SampleIdMatchType,SampleIdPattern,Expected,Note,Enabled,Priority
-*,REGEX,^[^_]+_[^_]+_0_,NEG,Token2=0 => Negative Control (expected NEG),TRUE,9000
-*,REGEX,^[^_]+_[^_]+_[1-5]_,POS,Token2=1-5 => Positive Control (expected POS),TRUE,8990
-*,PREFIX,NEG_,NEG,Legacy: Sample ID starts with NEG_,TRUE,5000
-*,PREFIX,POS_,POS,Legacy: Sample ID starts with POS_,TRUE,4990
