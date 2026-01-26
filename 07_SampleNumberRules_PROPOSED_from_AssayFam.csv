@@ -1,0 +1,93 @@
+﻿AssayPattern,SampleTypeCode,SampleNumberTokenIndex,SampleNumberRegex,SampleNumberMin,SampleNumberMax,SampleNumberPad,Enabled,Note,Priority
+Respiratory Panel IUO,0,3,^\d{2}$,1,10,2,TRUE,"Derived from AssayFam: distinct=10, observed=01-10",9000
+Respiratory Panel IUO,1,3,^\d{2}$,11,14,2,TRUE,"Derived from AssayFam: distinct=4, observed=11-14",9000
+Respiratory Panel IUO,2,3,^\d{2}$,15,16,2,TRUE,"Derived from AssayFam: distinct=2, observed=15-16",9000
+Respiratory Panel IUO,3,3,^\d{2}$,17,18,2,TRUE,"Derived from AssayFam: distinct=2, observed=17-18",9000
+Respiratory Panel IUO,4,3,^\d{2}$,19,20,2,TRUE,"Derived from AssayFam: distinct=2, observed=19-20",9000
+TAP Panel IUO,0,3,^\d{2}$,1,10,2,TRUE,"Derived from AssayFam: distinct=10, observed=01-10",9000
+TAP Panel IUO,1,3,^\d{2}$,1,20,2,TRUE,"Derived from AssayFam: distinct=20, observed=01-20",9000
+Xpert C.difficile BT,0,3,^\d{2}$,1,10,2,TRUE,"Derived from AssayFam: distinct=10, observed=01-10",9000
+Xpert C.difficile BT,1,3,^\d{2}$,11,20,2,TRUE,"Derived from AssayFam: distinct=10, observed=11-20",9000
+Xpert C.difficile G3,0,3,^\d{2}$,1,10,2,TRUE,"Derived from AssayFam: distinct=10, observed=01-10",9000
+Xpert C.difficile G3,1,3,^\d{2}$,11,20,2,TRUE,"Derived from AssayFam: distinct=10, observed=11-20",9000
+Xpert C.difficile G3,2,3,^\d{2}$,18,19,2,TRUE,"Derived from AssayFam: distinct=2, observed=18-19",9000
+Xpert C.difficile G3,3,3,^\d{2}$,20,20,2,TRUE,"Derived from AssayFam: distinct=1, observed=20-20",9000
+Xpert CT_NG,0,3,^\d{2}$,1,10,2,TRUE,"Derived from AssayFam: distinct=10, observed=01-10",9000
+Xpert CT_NG,1,3,^\d{2}$,11,20,2,TRUE,"Derived from AssayFam: distinct=10, observed=11-20",9000
+Xpert CT_NG,2,3,^\d{2}$,19,19,2,TRUE,"Derived from AssayFam: distinct=1, observed=19-19",9000
+Xpert CT_NG,3,3,^\d{2}$,20,20,2,TRUE,"Derived from AssayFam: distinct=1, observed=20-20",9000
+Xpert Ebola EUA,0,3,^\d{2}$,1,10,2,TRUE,"Derived from AssayFam: distinct=10, observed=01-10",9000
+Xpert Ebola EUA,1,3,^\d{2}$,11,20,2,TRUE,"Derived from AssayFam: distinct=8, observed=11-18",9000
+Xpert Ebola EUA,2,3,^\d{2}$,19,20,2,TRUE,"Derived from AssayFam: distinct=2, observed=19-20",9000
+Xpert GBS LB XC,0,3,^\d{2}$,1,10,2,TRUE,"Derived from AssayFam: distinct=10, observed=01-10",9000
+Xpert GBS LB XC,1,3,^\d{2}$,1,20,2,TRUE,"Derived from AssayFam: distinct=20, observed=01-20",9000
+Xpert GI Panel,0,3,^\d{2}$,1,10,2,TRUE,"Derived from AssayFam: distinct=10, observed=01-10",9000
+Xpert GI Panel,1,3,^\d{2}$,1,20,2,TRUE,"Derived from AssayFam: distinct=20, observed=01-20",9000
+Xpert HBV Viral Load,0,3,^\d{2}$,1,10,2,TRUE,"Derived from AssayFam: distinct=10, observed=01-10",9000
+Xpert HBV Viral Load,1,3,^\d{2}$,1,20,2,TRUE,"Derived from AssayFam: distinct=18, observed=01-18",9000
+Xpert HBV Viral Load,2,3,^\d{2}$,19,20,2,TRUE,"Derived from AssayFam: distinct=2, observed=19-20",9000
+Xpert HCV PQC,0,3,^\d{2}$,1,10,2,TRUE,"Derived from AssayFam: distinct=10, observed=01-10",9000
+Xpert HCV PQC,1,3,^\d{2}$,1,20,2,TRUE,"Derived from AssayFam: distinct=20, observed=01-20",9000
+Xpert HCV VL Fingerstick,0,3,^\d{2}$,1,10,2,TRUE,"Derived from AssayFam: distinct=10, observed=01-10",9000
+Xpert HCV VL Fingerstick,1,3,^\d{2}$,1,20,2,TRUE,"Derived from AssayFam: distinct=18, observed=01-18",9000
+Xpert HCV VL Fingerstick,2,3,^\d{2}$,19,20,2,TRUE,"Derived from AssayFam: distinct=2, observed=19-20",9000
+Xpert HIV-1 Qual XC PQC,0,3,^\d{2}$,1,10,2,TRUE,"Derived from AssayFam: distinct=10, observed=01-10",9000
+Xpert HIV-1 Qual XC PQC,1,3,^\d{2}$,1,20,2,TRUE,"Derived from AssayFam: distinct=20, observed=01-20",9000
+Xpert HIV-1 Viral Load XC,0,3,^\d{2}$,1,10,2,TRUE,"Derived from AssayFam: distinct=10, observed=01-10",9000
+Xpert HIV-1 Viral Load XC,1,3,^\d{2}$,1,20,2,TRUE,"Derived from AssayFam: distinct=18, observed=01-18",9000
+Xpert HIV-1 Viral Load XC,2,3,^\d{2}$,19,20,2,TRUE,"Derived from AssayFam: distinct=2, observed=19-20",9000
+Xpert HPV HR,0,3,^\d{2}$,1,10,2,TRUE,"Derived from AssayFam: distinct=6, observed=01-06",9000
+Xpert HPV HR,1,3,^\d{2}$,1,20,2,TRUE,"Derived from AssayFam: distinct=18, observed=01-18",9000
+Xpert HPV HR,2,3,^\d{2}$,19,20,2,TRUE,"Derived from AssayFam: distinct=2, observed=19-20",9000
+Xpert MRSA NxG,0,3,^\d{2}$,1,10,2,TRUE,"Derived from AssayFam: distinct=10, observed=01-10",9000
+Xpert MRSA NxG,1,3,^\d{2}$,11,20,2,TRUE,"Derived from AssayFam: distinct=8, observed=11-18",9000
+Xpert MRSA NxG,2,3,^\d{2}$,19,20,2,TRUE,"Derived from AssayFam: distinct=2, observed=19-20",9000
+Xpert MRSA-SA SSTI G3,0,3,^\d{2}$,1,10,2,TRUE,"Derived from AssayFam: distinct=10, observed=01-10",9000
+Xpert MRSA-SA SSTI G3,1,3,^\d{2}$,11,20,2,TRUE,"Derived from AssayFam: distinct=10, observed=11-20",9000
+Xpert MTB-RIF Assay G4,0,3,^\d{2}$,1,10,2,TRUE,"Derived from AssayFam: distinct=10, observed=01-10",9000
+Xpert MTB-RIF Assay G4,1,3,^\d{2}$,11,20,2,TRUE,"Derived from AssayFam: distinct=10, observed=11-20",9000
+Xpert MTB-RIF JP IVD,0,3,^\d{2}$,1,10,2,TRUE,"Derived from AssayFam: distinct=10, observed=01-10",9000
+Xpert MTB-RIF JP IVD,1,3,^\d{2}$,11,16,2,TRUE,"Derived from AssayFam: distinct=6, observed=11-16",9000
+Xpert MTB-RIF JP IVD,2,3,^\d{2}$,17,17,2,TRUE,"Derived from AssayFam: distinct=1, observed=17-17",9000
+Xpert MTB-RIF JP IVD,3,3,^\d{2}$,18,18,2,TRUE,"Derived from AssayFam: distinct=1, observed=18-18",9000
+Xpert MTB-RIF JP IVD,4,3,^\d{2}$,19,19,2,TRUE,"Derived from AssayFam: distinct=1, observed=19-19",9000
+Xpert MTB-RIF JP IVD,5,3,^\d{2}$,20,20,2,TRUE,"Derived from AssayFam: distinct=1, observed=20-20",9000
+Xpert MTB-RIF Ultra,0,3,^\d{2}$,1,10,2,TRUE,"Derived from AssayFam: distinct=10, observed=01-10",9000
+Xpert MTB-RIF Ultra,1,3,^\d{2}$,11,20,2,TRUE,"Derived from AssayFam: distinct=8, observed=11-18",9000
+Xpert MTB-RIF Ultra,2,3,^\d{2}$,19,20,2,TRUE,"Derived from AssayFam: distinct=2, observed=19-20",9000
+Xpert MTB-XDR,0,3,^\d{2}$,1,10,2,TRUE,"Derived from AssayFam: distinct=10, observed=01-10",9000
+Xpert MTB-XDR,1,3,^\d{2}$,11,20,2,TRUE,"Derived from AssayFam: distinct=8, observed=11-18",9000
+Xpert MTB-XDR,2,3,^\d{2}$,19,20,2,TRUE,"Derived from AssayFam: distinct=2, observed=19-20",9000
+Xpert Norovirus,0,3,^\d{2}$,1,10,2,TRUE,"Derived from AssayFam: distinct=10, observed=01-10",9000
+Xpert Norovirus,1,3,^\d{2}$,11,20,2,TRUE,"Derived from AssayFam: distinct=8, observed=11-18",9000
+Xpert Norovirus,2,3,^\d{2}$,19,20,2,TRUE,"Derived from AssayFam: distinct=2, observed=19-20",9000
+Xpert SA Nasal Complete G3,0,3,^\d{2}$,1,10,2,TRUE,"Derived from AssayFam: distinct=10, observed=01-10",9000
+Xpert SA Nasal Complete G3,1,3,^\d{2}$,11,20,2,TRUE,"Derived from AssayFam: distinct=10, observed=11-20",9000
+Xpert Xpress CoV-2 plus IVD,0,3,^\d{2}$,1,10,2,TRUE,"Derived from AssayFam: distinct=10, observed=01-10",9000
+Xpert Xpress CoV-2 plus IVD,1,3,^\d{2}$,11,20,2,TRUE,"Derived from AssayFam: distinct=10, observed=11-20",9000
+Xpert Xpress Flu-RSV,0,3,^\d{2}$,1,10,2,TRUE,"Derived from AssayFam: distinct=10, observed=01-10",9000
+Xpert Xpress Flu-RSV,1,3,^\d{2}$,11,20,2,TRUE,"Derived from AssayFam: distinct=8, observed=11-18",9000
+Xpert Xpress Flu-RSV,2,3,^\d{2}$,19,20,2,TRUE,"Derived from AssayFam: distinct=2, observed=19-20",9000
+Xpert Xpress GBS,0,3,^\d{2}$,1,10,2,TRUE,"Derived from AssayFam: distinct=10, observed=01-10",9000
+Xpert Xpress GBS,1,3,^\d{2}$,1,20,2,TRUE,"Derived from AssayFam: distinct=20, observed=01-20",9000
+Xpert Xpress SARS-CoV-2 CE-IVD,0,3,^\d{2}$,1,10,2,TRUE,"Derived from AssayFam: distinct=10, observed=01-10",9000
+Xpert Xpress SARS-CoV-2 CE-IVD,1,3,^\d{2}$,11,20,2,TRUE,"Derived from AssayFam: distinct=10, observed=11-20",9000
+Xpert Xpress Strep A,0,3,^\d{2}$,1,10,2,TRUE,"Derived from AssayFam: distinct=10, observed=01-10",9000
+Xpert Xpress Strep A,1,3,^\d{2}$,11,20,2,TRUE,"Derived from AssayFam: distinct=8, observed=11-18",9000
+Xpert Xpress Strep A,2,3,^\d{2}$,19,20,2,TRUE,"Derived from AssayFam: distinct=2, observed=19-20",9000
+Xpert vanA vanB,0,3,^\d{2}$,1,10,2,TRUE,"Derived from AssayFam: distinct=10, observed=01-10",9000
+Xpert vanA vanB,1,3,^\d{2}$,11,20,2,TRUE,"Derived from AssayFam: distinct=10, observed=11-20",9000
+Xpert_Carba-R,0,3,^\d{2}$,1,14,2,TRUE,"Derived from AssayFam: distinct=14, observed=01-14",9000
+Xpert_Carba-R,1,3,^\d{2}$,15,18,2,TRUE,"Derived from AssayFam: distinct=4, observed=15-18",9000
+Xpert_Carba-R,2,3,^\d{2}$,19,20,2,TRUE,"Derived from AssayFam: distinct=2, observed=19-20",9000
+Xpert_HCV Viral Load,0,3,^\d{2}$,1,10,2,TRUE,"Derived from AssayFam: distinct=10, observed=01-10",9000
+Xpert_HCV Viral Load,1,3,^\d{2}$,1,20,2,TRUE,"Derived from AssayFam: distinct=18, observed=01-18",9000
+Xpert_HCV Viral Load,2,3,^\d{2}$,19,20,2,TRUE,"Derived from AssayFam: distinct=2, observed=19-20",9000
+Xpert_HIV-1 Viral Load,0,3,^\d{2}$,1,10,2,TRUE,"Derived from AssayFam: distinct=10, observed=01-10",9000
+Xpert_HIV-1 Viral Load,1,3,^\d{2}$,1,20,2,TRUE,"Derived from AssayFam: distinct=18, observed=01-18",9000
+Xpert_HIV-1 Viral Load,2,3,^\d{2}$,19,20,2,TRUE,"Derived from AssayFam: distinct=2, observed=19-20",9000
+Xpress Flu IPT_EAT off,0,3,^\d{2}$,1,10,2,TRUE,"Derived from AssayFam: distinct=10, observed=01-10",9000
+Xpress Flu IPT_EAT off,1,3,^\d{2}$,11,20,2,TRUE,"Derived from AssayFam: distinct=8, observed=11-18",9000
+Xpress Flu IPT_EAT off,2,3,^\d{2}$,19,20,2,TRUE,"Derived from AssayFam: distinct=2, observed=19-20",9000
+Xpress SARS-CoV-2_Flu_RSV plus,0,3,^\d{2}$,1,10,2,TRUE,"Derived from AssayFam: distinct=10, observed=01-10",9000
+Xpress SARS-CoV-2_Flu_RSV plus,1,3,^\d{2}$,11,20,2,TRUE,"Derived from AssayFam: distinct=10, observed=11-20",9000
