@@ -1,0 +1,26 @@
+--- a/New folder/Modules/RuleEngine.ps1
++++ b/New folder/Modules/RuleEngine.ps1
+@@ -1269,6 +1269,23 @@
+ 
+                 $expTT = ''
+                 if (($sid + '').Trim()) { $expTT = Get-ExpectedTestTypeDerived -SampleId ($sid + '') }
++                # If TestTypePolicy exists and is specimen-only, reflect that in output (ExpectedTestType).
++                # This does not change validation logic; it only makes RuleEngine_Debug clearer for users.
++                try {
++                    $polTT = Get-TestTypePolicyForAssayCached -RuleBank $RuleBank -Assay ($assay + '')
++                    if ($polTT) {
++                        $allowedTT = @()
++                        $rawTT = (($polTT.AllowedTestTypes + '')).Trim()
++                        if ($rawTT) {
++                            if ($rawTT -like '*|*') { $allowedTT = @($rawTT.Split('|') | ForEach-Object { ($_ + '').Trim() } | Where-Object { $_ }) }
++                            else { $allowedTT = @($rawTT.Split(',') | ForEach-Object { ($_ + '').Trim() } | Where-Object { $_ }) }
++                        }
++                        if ($allowedTT.Count -eq 1 -and ($allowedTT[0].ToUpperInvariant() -eq 'SPECIMEN')) {
++                            $expTT = 'Specimen'
++                        }
++                    }
++                } catch {}
++
+ 
+                 # ExpectedCall fallback: derive from Test Type / control code when no explicit rule matched
+                 $expCall = ($expD.Call + '').Trim().ToUpperInvariant()
