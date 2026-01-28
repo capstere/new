@@ -1,0 +1,96 @@
+diff -ruN /mnt/data/ps5c/PS5Compiled/Main.ps1 /mnt/data/ps5c_mod/Main.ps1
+--- /mnt/data/ps5c/PS5Compiled/Main.ps1	2026-01-28 10:40:56.000000000 +0000
++++ /mnt/data/ps5c_mod/Main.ps1	2026-01-28 12:03:18.109191277 +0000
+@@ -1440,7 +1440,7 @@
+                 $csvObjs = @()
+                 if ($csvRows -and $csvRows.Count -gt 0) {
+                     $csvObjs = @($csvRows)
+-                    Gui-Log ("🧠 RuleEngine (shadow): CSV-källa: Import-CsvRows ({0})" -f $csvObjs.Count) 'Info'
++                    Gui-Log ("🧠 RuleEngine (shadow): CSV-källa: Import-CsvRows ({0})" -f $csvObjs.Count) 'Info' 'RuleEngine'
+                 } else {
+                     try {
+                         $all = Get-Content -LiteralPath $selCsv
+@@ -1453,13 +1453,13 @@
+                     } catch {
+                         $csvObjs = @()
+                     }
+-                    Gui-Log ("🧠 RuleEngine (shadow): CSV-källa: Fallback-raw ({0})" -f ($csvObjs.Count)) 'Info'
++                    Gui-Log ("🧠 RuleEngine (shadow): CSV-källa: Fallback-raw ({0})" -f ($csvObjs.Count)) 'Info' 'RuleEngine'
+                 }
+ 
+                 $script:RuleEngineCsvObjs = $csvObjs
+ 
+                 if (-not $csvObjs -or $csvObjs.Count -eq 0) {
+-                    Gui-Log "⚠️ RuleEngine (shadow): CSV-objekt saknas (0 rader) – hoppar över." 'Warn'
++                    Gui-Log "⚠️ RuleEngine (shadow): CSV-objekt saknas (0 rader) – hoppar över." 'Warn' 'RuleEngine'
+                     $script:RuleEngineShadow = $null
+                 } else {
+                     $re = Invoke-RuleEngine -CsvObjects $csvObjs -RuleBank $rb -CsvPath $selCsv
+@@ -1468,13 +1468,13 @@
+                     if ($re -and $re.Summary) {
+                         $pairs = @()
+                         foreach ($k in $re.Summary.ObservedCounts.Keys) { $pairs += ("$k=$($re.Summary.ObservedCounts[$k])") }
+-                        if ($pairs.Count -gt 0) { Gui-Log ("🧠 RuleEngine (shadow): ObservedCall counts: " + ($pairs -join ', ')) 'Info' }
++                        if ($pairs.Count -gt 0) { Gui-Log ("🧠 RuleEngine (shadow): ObservedCall counts: " + ($pairs -join ', ')) 'Info' 'RuleEngine' }
+ 
+                         $dpairs = @()
+                         foreach ($k2 in $re.Summary.DeviationCounts.Keys) { $dpairs += ("$k2=$($re.Summary.DeviationCounts[$k2])") }
+-                        if ($dpairs.Count -gt 0) { Gui-Log ("🧠 RuleEngine (shadow): Deviations: " + ($dpairs -join ', ')) 'Info' }
++                        if ($dpairs.Count -gt 0) { Gui-Log ("🧠 RuleEngine (shadow): Deviations: " + ($dpairs -join ', ')) 'Info' 'RuleEngine' }
+ 
+-                        if ($re.Summary.RetestYes -gt 0) { Gui-Log ("🧠 RuleEngine (shadow): Retest=YES count: " + $re.Summary.RetestYes) 'Info' }
++                        if ($re.Summary.RetestYes -gt 0) { Gui-Log ("🧠 RuleEngine (shadow): Retest=YES count: " + $re.Summary.RetestYes) 'Info' 'RuleEngine' }
+ 
+                         if ((Test-ConfigFlag $Config 'EnableShadowCompare' $false) -and $re.TopDeviations) {
+                             $n = 0
+@@ -1489,7 +1489,7 @@
+                 }
+             }
+         } catch {
+-            Gui-Log ("⚠️ RuleEngine (shadow) fel: " + $_.Exception.Message) 'Warn'
++            Gui-Log ("⚠️ RuleEngine (shadow) fel: " + $_.Exception.Message) 'Warn' 'RuleEngine'
+         }
+ 
+         $controlTab = $null
+@@ -3190,7 +3190,7 @@
+                     # Om shadow saknas/tom: bygg från cache i första hand
+                     if (-not $script:RuleEngineShadow -or -not $script:RuleEngineShadow.Rows -or $script:RuleEngineShadow.Rows.Count -eq 0) {
+ 
+-                        Gui-Log "🧠 RuleEngine (shadow): saknas vid Save → bygger nu..." 'Warn'
++                        Gui-Log "🧠 RuleEngine (shadow): saknas vid Save → bygger nu..." 'Warn' 'RuleEngine'
+ 
+                         $rb2 = $script:RuleBankCache
+                         if (-not $rb2) {
+@@ -3219,16 +3219,16 @@
+                         if ($csvObjs2 -and $csvObjs2.Count -gt 0) {
+                             $script:RuleEngineShadow = Invoke-RuleEngine -CsvObjects $csvObjs2 -RuleBank $rb2 -CsvPath $selCsv
+                         } else {
+-                            Gui-Log "⚠️ RuleEngine (shadow): kunde inte bygga vid Save (0 rader)." 'Warn'
++                            Gui-Log "⚠️ RuleEngine (shadow): kunde inte bygga vid Save (0 rader)." 'Warn' 'RuleEngine'
+                         }
+                     }
+ 
+                     if ($script:RuleEngineShadow -and $script:RuleEngineShadow.Rows -and $script:RuleEngineShadow.Rows.Count -gt 0) {
+-                        Gui-Log "🧠 Skriver RuleEngine_Debug (shadow)..." 'Info'
++                        Gui-Log "🧠 Skriver RuleEngine_Debug (shadow)..." 'Info' 'RuleEngine'
+                         $includeAll = (Test-ConfigFlag $Config 'RuleEngineDebugIncludeAllRows' $false)
+                         [void](Write-RuleEngineDebugSheet -Pkg $pkgOut -RuleEngineResult $script:RuleEngineShadow -IncludeAllRows $includeAll)
+                     } else {
+-                        Gui-Log "⚠️ RuleEngine_Debug hoppar över: inget RuleEngine-resultat." 'Warn'
++                        Gui-Log "⚠️ RuleEngine_Debug hoppar över: inget RuleEngine-resultat." 'Warn' 'RuleEngine'
+                     }
+                 }
+             } catch {
+diff -ruN /mnt/data/ps5c/PS5Compiled/Modules/Config.ps1 /mnt/data/ps5c_mod/Modules/Config.ps1
+--- /mnt/data/ps5c/PS5Compiled/Modules/Config.ps1	2026-01-28 10:40:56.000000000 +0000
++++ /mnt/data/ps5c_mod/Modules/Config.ps1	2026-01-28 11:56:36.754033672 +0000
+@@ -66,6 +66,9 @@
+     EnableShadowCompare = $true        # Log diff between legacy and rules when EnableRuleEngine is on
+     EnableRuleEngineDebugSheet = $true        # Add RuleEngine_Debug worksheet to output (safe, appended)
+     RuleEngineDebugIncludeAllRows = $false # When true: write ALL rows in RuleEngine_Debug (legacy behavior)
++
++    # UI-logg: visa inte dev/RuleEngine-detaljer i GUI (sparas fortfarande i loggfil)
++    UiLogShowDev = $false
+ 
+     # EPPlus AutoFit strategy (performance)
+     # OFF   = no AutoFit (fastest)
