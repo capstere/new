@@ -1,0 +1,54 @@
+--- /mnt/data/ps5_runmode/PS5Compiled/Modules/Logging.ps1	2026-01-28 16:03:22.000000000 +0000
++++ /mnt/data/ps5_runmode_fix/PS5Compiled/Modules/Logging.ps1	2026-01-28 16:21:03.224679296 +0000
+@@ -70,7 +70,7 @@
+             -Message  $Text `
+             -Severity $Severity `
+             -Category $Category `
+-            -Data     $Data
++            -Context $Data
+     } catch {}
+ 
+     # --- Klassisk filbaserad logg ---
+@@ -96,10 +96,20 @@
+ 
+     )
+     try {
+-        if (-not $AuditDir) {
+-            if ($PSScriptRoot) { $AuditDir = Join-Path $PSScriptRoot 'audit' }
+-            else { $AuditDir = Join-Path $env:TEMP 'audit' }
+-        }
++        if (-not $AuditDir) {
++            try {
++                if ($env:IPT_NETWORK_ROOT -and (Test-Path -LiteralPath $env:IPT_NETWORK_ROOT)) {
++                    $AuditDir = Join-Path $env:IPT_NETWORK_ROOT 'audit'
++                } elseif ($PSScriptRoot) {
++                    $AuditDir = Join-Path $PSScriptRoot 'audit'
++                } else {
++                    $AuditDir = Join-Path $env:TEMP 'audit'
++                }
++            } catch {
++                if ($PSScriptRoot) { $AuditDir = Join-Path $PSScriptRoot 'audit' }
++                else { $AuditDir = Join-Path $env:TEMP 'audit' }
++            }
++        }
+ 
+         if (-not (Test-Path -LiteralPath $AuditDir)) { New-Item -ItemType Directory -Path $AuditDir -Force | Out-Null }
+ 
+--- /mnt/data/ps5_runmode/PS5Compiled/Modules/Config.ps1	2026-01-28 16:03:22.000000000 +0000
++++ /mnt/data/ps5_runmode_fix/PS5Compiled/Modules/Config.ps1	2026-01-28 16:22:14.025207701 +0000
+@@ -111,7 +111,14 @@
+ 
+ $SharePointBatchLinkTemplate = 'https://danaher.sharepoint.com/sites/CEP-Sweden-Production-Management/Lists/Cepheid%20%20Production%20orders/ROBAL.aspx?viewid=6c9e53c9-a377-40c1-a154-13a13866b52b&view=7&q={BatchNumber}'
+ 
+-$DevLogDir = Join-Path $ScriptRoot 'Loggar'
++$EffectiveRootForLogs = $ScriptRoot
++try {
++    if ($env:IPT_NETWORK_ROOT -and (Test-Path -LiteralPath $env:IPT_NETWORK_ROOT)) {
++        $EffectiveRootForLogs = $env:IPT_NETWORK_ROOT
++    }
++} catch {}
++
++$DevLogDir = Join-Path $EffectiveRootForLogs 'Loggar'
+ if (-not (Test-Path $DevLogDir)) { New-Item -ItemType Directory -Path $DevLogDir -Force | Out-Null }
+ $global:LogPath = Join-Path $DevLogDir ("$($env:USERNAME)_$(Get-Date -Format 'yyyyMMdd_HHmmss').txt")
+ $global:StructuredLogPath = [System.IO.Path]::ChangeExtension($global:LogPath, '.jsonl')
