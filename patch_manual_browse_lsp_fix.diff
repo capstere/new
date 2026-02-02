@@ -1,0 +1,42 @@
+diff -ur /mnt/data/proj_prev/zz_IPTCompile/Main.ps1 /mnt/data/proj_orig/zz_IPTCompile/Main.ps1
+--- /mnt/data/proj_prev/zz_IPTCompile/Main.ps1	2026-01-30 21:23:12.000000000 +0000
++++ /mnt/data/proj_orig/zz_IPTCompile/Main.ps1	2026-02-02 09:37:40.000000000 +0000
+@@ -1238,8 +1238,18 @@
+ 
+         if (-not $selNeg -or -not $selPos) { Gui-Log "❌ Du måste välja en Seal NEG och en Seal POS." 'Error'; return }
+ 
+-        $lsp = ($txtLSP.Text + '').Trim()
+-        if (-not $lsp) { Gui-Log "⚠️ Ange ett LSP-nummer." 'Warn'; return }
++        $lspRaw    = ($txtLSP.Text + '').Trim()
++        $lspDigits = ($lspRaw -replace '\D','')
++        $hasLsp    = -not [string]::IsNullOrWhiteSpace($lspDigits)
++
++        if ($hasLsp) {
++            $lsp = $lspDigits
++        } else {
++            $lsp = 'MANUELL'
++            Gui-Log "ℹ️ Ingen LSP angiven – kör manuellt läge (filval via Bläddra). Rapporten märks som '$lsp' och SharePoint/LSP-koppling hoppas över." 'Warn'
++        }
++
++        $lspForLinks = if ($hasLsp) { $lsp } else { '' }
+ 
+         # ---- Local staging for network files (N:\ or UNC) ----
+         # Speeds up runs when the project and inputs are stored on a shared drive.
+@@ -2228,7 +2238,7 @@
+         }
+     } catch {}
+ 
+-    $batchInfo = Get-BatchLinkInfo -SealPosPath $selPos -SealNegPath $selNeg -Lsp $lsp
++    $batchInfo = Get-BatchLinkInfo -SealPosPath $selPos -SealNegPath $selNeg -Lsp $lspForLinks
+     $batch     = $batchInfo.Batch
+ 
+     $wsInfo.Cells['A34'].Value = 'SharePoint Batch'
+@@ -2953,7 +2963,7 @@
+             Gui-Log ("⚠️ SharePoint ej tillgängligt: $errMsg") 'Warn'
+         }
+ 
+-        $batchInfo = Get-BatchLinkInfo -SealPosPath $selPos -SealNegPath $selNeg -Lsp $lsp
++        $batchInfo = Get-BatchLinkInfo -SealPosPath $selPos -SealNegPath $selNeg -Lsp $lspForLinks
+         $batch = $batchInfo.Batch
+ 
+         if (-not $batch) {
