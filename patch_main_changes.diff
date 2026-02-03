@@ -1,0 +1,62 @@
+--- /mnt/data/proj_orig/zz_IPTCompile/Main.ps1	2026-02-03 09:02:14.000000000 +0000
++++ /mnt/data/proj/zz_IPTCompile/Main.ps1	2026-02-03 17:01:39.112275465 +0000
+@@ -1434,16 +1434,17 @@
+                                     if ($re.Summary.ObservedCounts.ContainsKey('ERROR')) { $err = [int]$re.Summary.ObservedCounts['ERROR'] }
+                                 }
+ 
+-                                # Deviations: OK / FP / ERROR (match your log labels)
+-                                $ok = 0; $fp = 0; $derr = 0
++	                                # Deviations: OK / FP / FN / ERROR (match your log labels)
++	                                $ok = 0; $fp = 0; $fn = 0; $derr = 0
+                                 if ($re.Summary.DeviationCounts) {
+                                     if ($re.Summary.DeviationCounts.ContainsKey('OK'))    { $ok   = [int]$re.Summary.DeviationCounts['OK'] }
+                                     if ($re.Summary.DeviationCounts.ContainsKey('FP'))    { $fp   = [int]$re.Summary.DeviationCounts['FP'] }
++	                                    if ($re.Summary.DeviationCounts.ContainsKey('FN'))    { $fn   = [int]$re.Summary.DeviationCounts['FN'] }
+                                     if ($re.Summary.DeviationCounts.ContainsKey('ERROR')) { $derr = [int]$re.Summary.DeviationCounts['ERROR'] }
+                                 }
+ 
+                                 $rt = [int]$re.Summary.RetestYes
+-                                $sum = "⚖️ Regelkontroll: POS=$pos, NEG=$neg, FEL=$err | OK=$ok, FP=$fp, FEL=$derr | Omtest=$rt"
++	                                $sum = "⚖️ Regelkontroll: POS=$pos, NEG=$neg, FEL=$err | OK=$ok, FP=$fp, FN=$fn, FEL=$derr | Omtest=$rt"
+                                 Gui-Log -Text $sum -Severity Info -Category SUMMARY
+                             } catch { }
+                         }
+@@ -1591,10 +1592,23 @@
+             $wsOut1.Cells["B$row"].Style.Border.Right.Style = "Medium"
+             $wsOut1.Cells["C$row"].Style.Border.Left.Style  = "Medium"
+ 
+-            if ($mismatchFields -contains $f.Label -and $valNeg -ne $valPos) {
+-                $wsOut1.Cells["D$row"].Value = "Mismatch"
+-                Style-Cell $wsOut1.Cells["D$row"] $true "FF0000" "Medium" "FFFFFF"
+-                Gui-Log "⚠️ Avvikelse: $($f.Label) ($valNeg vs $valPos)"
++            if ($mismatchFields -contains $f.Label) {
++                $tNeg = ($valNeg + '').Trim()
++                $tPos = ($valPos + '').Trim()
++
++                # D3:D9 (selected fields): show explicit Match/Mismatch for transparency
++                if (($tNeg -ne $tPos) -and ($tNeg -or $tPos)) {
++                    $wsOut1.Cells["D$row"].Value = "Mismatch"
++                    Style-Cell $wsOut1.Cells["D$row"] $true "FF0000" "Medium" "FFFFFF"
++                    Gui-Log "⚠️ Avvikelse: $($f.Label) ($valNeg vs $valPos)"
++                }
++                elseif ($tNeg -or $tPos) {
++                    $wsOut1.Cells["D$row"].Value = "Match"
++                    Style-Cell $wsOut1.Cells["D$row"] $true "C6EFCE" "Medium" "006100"
++                }
++                else {
++                    $wsOut1.Cells["D$row"].Value = $null
++                }
+             }
+             $row++
+         }
+@@ -1692,7 +1706,9 @@
+                 param([OfficeOpenXml.ExcelWorksheet]$Sheet,[int]$RowIndex,[int]$ColStart=2,[int]$ColEnd=3,[string]$Text)
+                 $rng = $Sheet.Cells[$RowIndex, $ColStart, $RowIndex, $ColEnd]
+                 $rng.Style.WrapText = $true
+-                $rng.Style.Fill.PatternType = [OfficeOpenXml.Style.ExcelFillStyle]::None
++	                # Do NOT override fill/formatting here.
++	                # The caller sets the desired style (e.g. CCFFFF + medium border)
++	                # and this helper should only handle wrapping + row height.
+                 $Sheet.Row($RowIndex).CustomHeight = $false
+                 try {
+                     $wChars = [Math]::Floor(($Sheet.Column($ColStart).Width + $Sheet.Column($ColEnd).Width) - 2); if ($wChars -lt 1) { $wChars = 1 }
