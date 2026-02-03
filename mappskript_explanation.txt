@@ -1,0 +1,42 @@
+
+För att förhindra att skriptet raderar en logotyp från vänster sidhuvud har Mappskript.ps1 uppdaterats i funktionen `worksheet`.  I originalversionen sattes sidhuvudet så här:
+
+```
+$book.Worksheets | %{
+    if($_.Name -notlike "*QC Data*"){$_.Protection.IsProtected = $false}
+    $_.HeaderFooter.OddHeader.LeftAlignedText = “…multi‑line text för Part/Batch/LSP…”
+}
+```
+
+När man ersätter hela `LeftAlignedText` på det sättet utan att inkludera den speciella koden `&G` tas eventuella bilder borthttps://epplussoftware.com/docs/8.1/api/OfficeOpenXml.ExcelHeaderFooter.html#:~:text=.  Det innebar att mallar som hade en inlagd logotyp (t.ex. D48450) fick logotypen raderad när en ny mapp skapades.
+
+### Förändring i skriptet
+
+I den modifierade versionen undersöks först om det finns en bild i sidhuvudet.  EPPlus lagrar header‑bilder i egenskapen `Pictures` på `OddHeader`.  Om antalet bilder är större än noll, eller om `LeftHeaderPicture.Filename` inte är tomt, läggs konstantsymbolen `ExcelHeaderFooter.Image` (vilket motsvarar Excel‑koden `&G`) till i början av headersträngen.  Därefter byggs headertexten upp med radbrytningar (\`n) och de aktuella värdena för Part No., Batch No(s). och Cartridge No. (LSP).  På så sätt behåller vi logotypen när den finns, och lägger inte till en extra tom bildkod när det inte finns någon bild.
+
+Kodskissen:
+
+```
+$book.Worksheets | %{
+    # tillåt redigering på alla ark utom QC Data
+    if($_.Name -notlike "*QC Data*"){$_.Protection.IsProtected = $false}
+
+    $imgPrefix = ""
+    try {
+        $pictures = $_.HeaderFooter.OddHeader.Pictures
+        if ($pictures -ne $null -and $pictures.Count -gt 0) {
+            $imgPrefix = [OfficeOpenXml.Drawing.HeaderFooter.ExcelHeaderFooter]::Image + "`n"
+        }
+    } catch {
+        # fallback för äldre EPPlus-versioner
+        if ($_.HeaderFooter.LeftHeaderPicture -and $_.HeaderFooter.LeftHeaderPicture.Filename -ne "") {
+            $imgPrefix = [OfficeOpenXml.Drawing.HeaderFooter.ExcelHeaderFooter]::Image + "`n"
+        }
+    }
+
+    $headerText = $imgPrefix + "Part No.: $partnr`nBatch No(s).: $batchnr`nCartridge No. (LSP): $LSP"
+    $_.HeaderFooter.OddHeader.LeftAlignedText = $headerText
+}
+```
+
+Den här ändringen gör att alla arbetsblad som redan har en inlagd bild i sitt vänsterhuvud behåller logotypen. För arbetsblad utan bild förblir sidhuvudet textbaserat utan att en tom bild läggs till.
