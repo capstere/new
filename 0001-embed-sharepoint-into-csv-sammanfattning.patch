@@ -1,0 +1,271 @@
+--- /mnt/data/IPTCompile_orig/IPTCompile/zz_IPTCompile/Main.ps1	2026-02-04 13:17:04.000000000 +0000
++++ /mnt/data/IPTCompile/IPTCompile/zz_IPTCompile/Main.ps1	2026-02-04 16:41:14.726920282 +0000
+@@ -1104,98 +1104,154 @@
+     function Write-SPSheet-Safe {
+         param(
+             [OfficeOpenXml.ExcelPackage]$Pkg,
+-            [object]$Rows,                    
+-            [string[]]$DesiredOrder,            
+-            [string]$Batch
++            [object]$Rows,
++            [string[]]$DesiredOrder,
++            [string]$Batch,
++
++            # Om angivet: skriv SharePoint-sektionen inuti ett befintligt blad (t.ex. "CSV Sammanfattning")
++            [string]$TargetWorksheetName,
++            [int]$StartRow = 1,
++            [int]$StartCol = 16,
++
++            # Om angivet: radera ev. fristående blad "SharePoint Info" efter att vi bäddat in panelen
++            [switch]$DeleteStandaloneSheet
+         )
++
+         if (-not $Pkg) { return $false }
+         $Rows = @($Rows)
+-        $name = "SharePoint Info"
+-        $wsOld = $Pkg.Workbook.Worksheets[$name]
+-        if ($wsOld) { $Pkg.Workbook.Worksheets.Delete($wsOld) }
+-        $ws = $Pkg.Workbook.Worksheets.Add($name)
+-        if ($Rows.Count -eq 0 -or $Rows[0] -eq $null) {
+-            $ws.Cells[1,1].Value = "No rows found (Batch=$Batch)"
+-            return $true
++
++        # Färger (harmoniserar med RuleEngine.ps1: CSV Sammanfattning)
++        $spHeaderBg  = [System.Drawing.Color]::FromArgb(68, 84, 106)   # mörkblå
++        $spHeaderFg  = [System.Drawing.Color]::White
++        $spSectionBg = [System.Drawing.Color]::FromArgb(217, 225, 242) # ljusblå
++        $spSectionFg = [System.Drawing.Color]::FromArgb(0, 32, 96)
++
++        $ws = $null
++        $standaloneName = 'SharePoint Info'
++
++        if ($TargetWorksheetName) {
++            $ws = $Pkg.Workbook.Worksheets[$TargetWorksheetName]
++            if (-not $ws) { return $false }
++        } else {
++            $wsOld = $Pkg.Workbook.Worksheets[$standaloneName]
++            if ($wsOld) { $Pkg.Workbook.Worksheets.Delete($wsOld) }
++            $ws = $Pkg.Workbook.Worksheets.Add($standaloneName)
++            $StartRow = 1
++            $StartCol = 1
+         }
+-        $isKV = ($Rows[0].psobject.Properties.Name -contains 'Rubrik') -and `
+-                ($Rows[0].psobject.Properties.Name -contains 'Värde')
+-        if ($isKV) {
+-            $ws.Cells[1,1].Value = "SharePoint Information"
+-            $ws.Cells[1,2].Value = ""
+-            $ws.Cells["A1:B1"].Merge = $true
+-            $ws.Cells["A1"].Style.Font.Bold = $true
+-            $ws.Cells["A1"].Style.Font.Size = 12
+-            $ws.Cells["A1"].Style.Font.Color.SetColor([System.Drawing.Color]::White)
+-            $ws.Cells["A1"].Style.Fill.PatternType = "Solid"
+-            $ws.Cells["A1"].Style.Fill.BackgroundColor.SetColor([System.Drawing.Color]::DarkBlue)
+-            $ws.Cells["A1"].Style.HorizontalAlignment = "Center"
+-            $ws.Cells["A1"].Style.VerticalAlignment   = "Center"
+ 
+-            $r = 2
++        # För embed: städa panelytan (snäv yta: två kolumner, upp till 80 rader)
++        if ($TargetWorksheetName) {
++            try {
++                $clearEndRow = $StartRow + 80
++                $ws.Cells[$StartRow, $StartCol, $clearEndRow, ($StartCol + 1)].Clear() | Out-Null
++            } catch {}
++        }
++
++        $isKV = $false
++        if ($Rows.Count -gt 0 -and $Rows[0] -ne $null) {
++            $isKV = ($Rows[0].psobject.Properties.Name -contains 'Rubrik') -and ($Rows[0].psobject.Properties.Name -contains 'Värde')
++        }
++
++        # Header
++        $ws.Cells[$StartRow, $StartCol].Value = 'SharePoint Info'
++        $hdr = $ws.Cells[$StartRow, $StartCol, $StartRow, ($StartCol + 1)]
++        $hdr.Merge = $true
++        $hdr.Style.Font.Bold = $true
++        $hdr.Style.Font.Size = 12
++        $hdr.Style.Fill.PatternType = [OfficeOpenXml.Style.ExcelFillStyle]::Solid
++        $hdr.Style.Fill.BackgroundColor.SetColor($spHeaderBg)
++        $hdr.Style.Font.Color.SetColor($spHeaderFg)
++        $hdr.Style.HorizontalAlignment = [OfficeOpenXml.Style.ExcelHorizontalAlignment]::Center
++        $hdr.Style.VerticalAlignment   = [OfficeOpenXml.Style.ExcelVerticalAlignment]::Center
++        try { $ws.Row($StartRow).Height = 22 } catch {}
++
++        $r = $StartRow + 1
++
++        if (-not $Batch) { $Batch = '—' }
++
++        if ($Rows.Count -eq 0 -or $Rows[0] -eq $null) {
++            # Minimalt men konsekvent innehåll
++            $ws.Cells[$r, $StartCol].Value = 'Batch'
++            $ws.Cells[$r, ($StartCol + 1)].Value = $Batch
++            $r++
++            $ws.Cells[$r, $StartCol].Value = 'Info'
++            $ws.Cells[$r, ($StartCol + 1)].Value = 'No matching SharePoint row'
++            $r++
++        }
++        elseif ($isKV) {
+             foreach ($row in $Rows) {
+-                $ws.Cells[$r,1].Value = $row.Rubrik
+-                $ws.Cells[$r,2].Value = $row.'Värde'
++                $ws.Cells[$r, $StartCol].Value = $row.Rubrik
++                $ws.Cells[$r, ($StartCol + 1)].Value = $row.'Värde'
+                 $r++
+             }
+-            $lastRow = $r-1
+-            $ws.Cells["A2:A$lastRow"].Style.Font.Bold = $true
+-            $ws.Cells["A2:A$lastRow"].Style.Fill.PatternType = "Solid"
+-            $ws.Cells["A2:A$lastRow"].Style.Fill.BackgroundColor.SetColor([System.Drawing.Color]::Gainsboro)
+-            $ws.Cells["B2:B$lastRow"].Style.Fill.PatternType = "Solid"
+-            $ws.Cells["B2:B$lastRow"].Style.Fill.BackgroundColor.SetColor([System.Drawing.Color]::WhiteSmoke)
+-
+-            $rng = $ws.Cells["A1:B$lastRow"]
+-            $rng.Style.Font.Name = "Arial"
+-            $rng.Style.Font.Size = 10
+-            $rng.Style.HorizontalAlignment = "Left"
+-            $rng.Style.VerticalAlignment   = "Center"
+-            $rng.Style.Border.Top.Style    = "Thin"
+-            $rng.Style.Border.Bottom.Style = "Thin"
+-            $rng.Style.Border.Left.Style   = "Thin"
+-            $rng.Style.Border.Right.Style  = "Thin"
+-            $rng.Style.Border.BorderAround("Medium")
+-            try {
+-                if (Get-Command Safe-AutoFitColumns -ErrorAction SilentlyContinue) {
+-                    Safe-AutoFitColumns -Ws $ws -Range $rng -Context 'InfoSheet'
+-                } else {
+-                    $rng.AutoFitColumns() | Out-Null
+-                }
+-            } catch {}
+         }
+         else {
++            # Fallback: 2-kolumners panel om data ej är KV
+             $cols = @()
+             if ($DesiredOrder) { $cols += $DesiredOrder }
+             foreach ($k in $Rows[0].psobject.Properties.Name) {
+                 if ($cols -notcontains $k) { $cols += $k }
+             }
+ 
+-            for ($c=0; $c -lt $cols.Count; $c++) {
+-                $ws.Cells[1,$c+1].Value = $cols[$c]
+-                $ws.Cells[1,$c+1].Style.Font.Bold = $true
+-            }
+-            $r = 2
+-            foreach ($row in $Rows) {
+-                for ($c=0; $c -lt $cols.Count; $c++) {
+-                    $ws.Cells[$r,$c+1].Value = $row.$($cols[$c])
+-                }
++            $k1 = if ($cols.Count -gt 0) { $cols[0] } else { 'Key' }
++            $k2 = if ($cols.Count -gt 1) { $cols[1] } else { 'Value' }
++
++            foreach ($rowObj in $Rows) {
++                $ws.Cells[$r, $StartCol].Value = $rowObj.$k1
++                $ws.Cells[$r, ($StartCol + 1)].Value = $rowObj.$k2
+                 $r++
+             }
++        }
++
++        $lastRow = $r - 1
++        if ($lastRow -lt ($StartRow + 1)) { $lastRow = ($StartRow + 1) }
++
++        # Key/Value styling
++        try {
++            $keyRange = $ws.Cells[($StartRow + 1), $StartCol, $lastRow, $StartCol]
++            $valRange = $ws.Cells[($StartRow + 1), ($StartCol + 1), $lastRow, ($StartCol + 1)]
++
++            $keyRange.Style.Font.Bold = $true
++            $keyRange.Style.Fill.PatternType = [OfficeOpenXml.Style.ExcelFillStyle]::Solid
++            $keyRange.Style.Fill.BackgroundColor.SetColor($spSectionBg)
++            $keyRange.Style.Font.Color.SetColor($spSectionFg)
++
++            $valRange.Style.Fill.PatternType = [OfficeOpenXml.Style.ExcelFillStyle]::Solid
++            $valRange.Style.Fill.BackgroundColor.SetColor([System.Drawing.Color]::WhiteSmoke)
++            $valRange.Style.WrapText = $true
++            $valRange.Style.VerticalAlignment = [OfficeOpenXml.Style.ExcelVerticalAlignment]::Top
++
++            $rngAll = $ws.Cells[$StartRow, $StartCol, $lastRow, ($StartCol + 1)]
++            $rngAll.Style.Font.Name = 'Calibri'
++            $rngAll.Style.Font.Size = 10
++            $rngAll.Style.Border.Top.Style    = [OfficeOpenXml.Style.ExcelBorderStyle]::Thin
++            $rngAll.Style.Border.Bottom.Style = [OfficeOpenXml.Style.ExcelBorderStyle]::Thin
++            $rngAll.Style.Border.Left.Style   = [OfficeOpenXml.Style.ExcelBorderStyle]::Thin
++            $rngAll.Style.Border.Right.Style  = [OfficeOpenXml.Style.ExcelBorderStyle]::Thin
++
+             try {
+-                if ($ws.Dimension) {
+-                    $maxR = [Math]::Min($ws.Dimension.End.Row, 2000)
+-                    $rAF = $ws.Cells[$ws.Dimension.Start.Row,$ws.Dimension.Start.Column,$maxR,$ws.Dimension.End.Column]
+-                    if (Get-Command Safe-AutoFitColumns -ErrorAction SilentlyContinue) {
+-                        Safe-AutoFitColumns -Ws $ws -Range $rAF -Context 'TableSheet'
+-                    } else {
+-                        $rAF.AutoFitColumns() | Out-Null
+-                    }
++                $ws.Column($StartCol).Width = 22
++                $ws.Column($StartCol + 1).Width = 55
++            } catch {}
++
++            try {
++                if (Get-Command Safe-AutoFitColumns -ErrorAction SilentlyContinue) {
++                    Safe-AutoFitColumns -Ws $ws -Range $rngAll -Context 'SharePointPanel'
+                 }
+             } catch {}
++        } catch {}
++
++        if ($DeleteStandaloneSheet) {
++            try {
++                $old = $Pkg.Workbook.Worksheets[$standaloneName]
++                if ($old) { $Pkg.Workbook.Worksheets.Delete($old) }
++            } catch {}
+         }
++
+         return $true
+     }
+-}           
++}
+ 
+ # ============================
+ # ===== RAPPORTLOGIK =========
+@@ -2895,6 +2951,8 @@
+ # === SharePoint Info      ===
+ # ============================
+ try {
++    $script:SpPanelData = $null
++
+     $skipSpInfo = -not $global:SpEnabled  # Always include SharePoint Info unless disabled in config
+ 
+     if ($skipSpInfo) {
+@@ -2921,6 +2979,8 @@
+ 
+         if (-not $batch) {
+             Gui-Log "ℹ️ Inget Batch # i POS/NEG – skriver tom SharePoint Info." 'Info'
++            $script:SpPanelData = @{ Rows = @(); DesiredOrder = @(); Batch = '—' }
++
+             if (Get-Command Write-SPSheet-Safe -ErrorAction SilentlyContinue) {
+                 [void](Write-SPSheet-Safe -Pkg $pkgOut -Rows @() -DesiredOrder @() -Batch '—')
+             } else {
+@@ -3031,6 +3091,8 @@
+                     Gui-Log "⚠️ SP: Get-PnPListItem misslyckades: $($_.Exception.Message)" 'Warn'
+                 }
+             }
++            $script:SpPanelData = @{ Rows = $rows; DesiredOrder = $desiredOrder; Batch = $batch }
++
+ 
+             if (Get-Command Write-SPSheet-Safe -ErrorAction SilentlyContinue) {
+                 [void](Write-SPSheet-Safe -Pkg $pkgOut -Rows $rows -DesiredOrder $desiredOrder -Batch $batch)
+@@ -3179,7 +3241,17 @@
+                     if ($script:RuleEngineShadow -and $script:RuleEngineShadow.Rows -and $script:RuleEngineShadow.Rows.Count -gt 0) {
+                         Gui-Log "🧠 Skriver Sammanfattning av CSV..." 'Info'
+                         $includeAll = Get-ConfigFlag -Name 'RuleEngineDebugIncludeAllRows' -Default $false -ConfigOverride $Config
+-                        [void](Write-RuleEngineDebugSheet -Pkg $pkgOut -RuleEngineResult $script:RuleEngineShadow -IncludeAllRows $includeAll)
++                        
++
++                        # Om SharePoint Info skapades: bädda in den till höger i 'CSV Sammanfattning' och ta bort separat flik
++                        try {
++                            if ($script:SpPanelData -and $pkgOut.Workbook.Worksheets['CSV Sammanfattning']) {
++                                [void](Write-SPSheet-Safe -Pkg $pkgOut -Rows $script:SpPanelData.Rows -DesiredOrder $script:SpPanelData.DesiredOrder -Batch $script:SpPanelData.Batch -TargetWorksheetName 'CSV Sammanfattning' -StartRow 1 -StartCol 16 -DeleteStandaloneSheet)
++                            }
++                        } catch {
++                            Gui-Log ("⚠️ Kunde inte bädda in SharePoint-panel i CSV Sammanfattning: $($_.Exception.Message)") 'Warn'
++                        }
++
+                     } else {
+                         Gui-Log "⚠️ RuleEngine_Debug hoppar över: inget RuleEngine-resultat." 'Warn'
+                     }

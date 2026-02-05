@@ -1,0 +1,34 @@
+--- IPTCompile/zz_IPTCompile/Main.ps1
++++ IPTCompile/zz_IPTCompile/Main.ps1
+@@ -3251,15 +3251,6 @@
+                             Gui-Log "⚠️ Write-RuleEngineDebugSheet saknas – kan inte skapa 'CSV Sammanfattning'." 'Warn'
+                         }
+ 
+-                        # Om SharePoint Info skapades: bädda in den till höger i 'CSV Sammanfattning' och ta bort separat flik
+-                        try {
+-                            if ($script:SpPanelData -and $pkgOut.Workbook.Worksheets['CSV Sammanfattning']) {
+-                                [void](Write-SPSheet-Safe -Pkg $pkgOut -Rows $script:SpPanelData.Rows -DesiredOrder $script:SpPanelData.DesiredOrder -Batch $script:SpPanelData.Batch -TargetWorksheetName 'CSV Sammanfattning' -StartRow 1 -StartCol 16 -DeleteStandaloneSheet)
+-                            }
+-                        } catch {
+-                            Gui-Log ("⚠️ Kunde inte bädda in SharePoint-panel i CSV Sammanfattning: $($_.Exception.Message)") 'Warn'
+-                        }
+-
+                     } else {
+                         Gui-Log "⚠️ RuleEngine_Debug hoppar över: inget RuleEngine-resultat." 'Warn'
+                     }
+@@ -3268,6 +3259,15 @@
+                 Gui-Log ("⚠️ Kunde inte skriva RuleEngine_Debug: " + $_.Exception.Message) 'Warn'
+             }
+ 
++
++            # SharePoint-panel: om 'CSV Sammanfattning' finns så bäddar vi in panelen till höger och tar bort separat flik
++            try {
++                if ($script:SpPanelData -and $pkgOut.Workbook.Worksheets['CSV Sammanfattning']) {
++                    [void](Write-SPSheet-Safe -Pkg $pkgOut -Rows $script:SpPanelData.Rows -DesiredOrder $script:SpPanelData.DesiredOrder -Batch $script:SpPanelData.Batch -TargetWorksheetName 'CSV Sammanfattning' -StartRow 1 -StartCol 16 -DeleteStandaloneSheet)
++                }
++            } catch {
++                Gui-Log ("⚠️ Kunde inte bädda in SharePoint-panel i CSV Sammanfattning: $($_.Exception.Message)") 'Warn'
++            }
+             Set-UiStep 90 'Sparar rapport…'
+             $pkgOut.SaveAs($SavePath)
+             Set-UiStep 100 'Klar ✅'

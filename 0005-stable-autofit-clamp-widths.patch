@@ -1,0 +1,53 @@
+--- /mnt/data/IPTCompile_orig/IPTCompile/zz_IPTCompile/Modules/DataHelpers.ps1	2026-02-03 21:44:05.000000000 +0000
++++ /mnt/data/IPTCompile_stage/IPTCompile/zz_IPTCompile/Modules/DataHelpers.ps1	2026-02-04 17:16:53.918117336 +0000
+@@ -1713,6 +1713,7 @@
+         [Parameter(Mandatory=$false)][object]$Range,
+         [Parameter(Mandatory=$false)][ValidateSet('OFF','ON','SMART')][string]$Mode,
+         [Parameter(Mandatory=$false)][int]$MaxRows,
++        [Parameter(Mandatory=$false)][double]$MaxWidth,
+         [Parameter(Mandatory=$false)][string]$Context
+     )
+ 
+@@ -1735,6 +1736,18 @@
+     }
+     if ($MaxRows -le 0) { $MaxRows = 500 }
+ 
++    # Resolve MaxWidth from config when not explicitly provided.
++    # Detta skyddar mot extremt breda kolumner (t.ex. långa policy-/loggsträngar)
++    # och gör output mer stabil utan att ändra data.
++    if ($MaxWidth -le 0) {
++        try {
++            if ($global:Config -and ($global:Config -is [hashtable]) -and $global:Config.ContainsKey('EpplusAutoFitMaxWidth')) {
++                $MaxWidth = [double]$global:Config['EpplusAutoFitMaxWidth']
++            }
++        } catch {}
++    }
++    if ($MaxWidth -le 0) { $MaxWidth = 60 }
++
+     switch ($Mode) {
+         'OFF' { return }
+         default { }
+@@ -1763,5 +1776,23 @@
+     }
+ 
+     try { $rng.AutoFitColumns() | Out-Null } catch {}
++
++    # Optional: clamp widths to MaxWidth for stability.
++    # (No data changes; only presentation.)
++    try {
++        if ($MaxWidth -gt 0) {
++            $startCol = [int]$rng.Start.Column
++            $endCol   = [int]$rng.End.Column
++            for ($c = $startCol; $c -le $endCol; $c++) {
++                try {
++                    $colObj = $Ws.Column($c)
++                    if ($colObj -and $colObj.Width -gt $MaxWidth) {
++                        $colObj.Width = $MaxWidth
++                        try { $colObj.Style.WrapText = $true } catch {}
++                    }
++                } catch {}
++            }
++        }
++    } catch {}
+ }
+ 

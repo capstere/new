@@ -1,0 +1,17 @@
+--- /mnt/data/IPTCompile_orig/IPTCompile/zz_IPTCompile/Modules/RuleEngine.ps1	2026-02-04 14:11:41.000000000 +0000
++++ /mnt/data/IPTCompile_stage/IPTCompile/zz_IPTCompile/Modules/RuleEngine.ps1	2026-02-04 17:19:58.686936000 +0000
+@@ -2701,6 +2701,14 @@
+ # KOLUMNBREDDER
+ # ============================================================================
+ try {
++    # Stabilitet i layout: långa textfält wrap:as så AutoFit inte ger extremt breda kolumner.
++    # (Påverkar endast presentation, inte data.)
++    try {
++        $ws.Column(4).Style.WrapText  = $true   # Notering
++        $ws.Column(14).Style.WrapText = $true  # Error
++        $ws.Cells[$tableHeaderRow, 1, $endRow, $colCount].Style.VerticalAlignment = [OfficeOpenXml.Style.ExcelVerticalAlignment]::Top
++    } catch {}
++
+     $rAll = $ws.Cells[1, 1, $endRow, $colCount]
+     if (Get-Command Safe-AutoFitColumns -ErrorAction SilentlyContinue) {
+         Safe-AutoFitColumns -Ws $ws -Range $rAll -Context 'CSV Sammanfattning'

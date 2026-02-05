@@ -1,0 +1,67 @@
+--- /mnt/data/IPTCompile_orig/IPTCompile/zz_IPTCompile/Main.ps1	2026-02-04 13:17:04.000000000 +0000
++++ /mnt/data/IPTCompile_stage/IPTCompile/zz_IPTCompile/Main.ps1	2026-02-04 17:15:16.431126550 +0000
+@@ -1219,6 +1219,7 @@
+     # RuleEngine caches (per-körning)
+     $script:RuleEngineShadow  = $null
+     $script:RuleEngineCsvObjs = $null
++    $script:RuleEngineShadowAttempted = $false
+     $script:RuleBankCache     = $null
+ 
+     try {
+@@ -1412,6 +1413,10 @@
+         try {
+             if ((Get-ConfigFlag -Name 'EnableRuleEngine' -Default $false -ConfigOverride $Config) -and
+                 $selCsv -and (Test-Path -LiteralPath $selCsv)) {
++                # Markera att vi har försökt bygga RuleEngine shadow i denna session.
++                # Detta används senare vid Save för att undvika dubbelkörning.
++                $script:RuleEngineShadowAttempted = $true
++
+ 
+                 # Load rulebank once
+                 $rb = Load-RuleBank -RuleBankDir $Config.RuleBankDir
+@@ -3140,39 +3145,14 @@
+                     (Get-ConfigFlag -Name 'EnableRuleEngineDebugSheet' -Default $false -ConfigOverride $Config) -and
+                     $selCsv -and (Test-Path -LiteralPath $selCsv)) {
+ 
+-                    # Om shadow saknas/tom: bygg från cache i första hand
++                    # Om shadow saknas/tom: bygg INTE igen vid Save.
++                    # Motivering: RuleEngine (shadow) byggs redan i körflödet och cachas per session.
++                    # Om den saknas här är det ett legitimt "ingen data"-läge, och vi undviker dubbelkörning.
+                     if (-not $script:RuleEngineShadow -or -not $script:RuleEngineShadow.Rows -or $script:RuleEngineShadow.Rows.Count -eq 0) {
+-
+-                        Gui-Log "🧠 RuleEngine (shadow): saknas vid Save → bygger nu..." 'Warn'
+-
+-                        $rb2 = $script:RuleBankCache
+-                        if (-not $rb2) {
+-                            $rb2 = Load-RuleBank -RuleBankDir $Config.RuleBankDir
+-                            try { $rb2 = Compile-RuleBank -RuleBank $rb2 } catch {}
+-                        }
+-
+-                        $csvObjs2 = $script:RuleEngineCsvObjs
+-                        if (-not $csvObjs2 -or $csvObjs2.Count -eq 0) {
+-                            $csvObjs2 = @()
+-                            if ($csvRows -and $csvRows.Count -gt 0) {
+-                                $csvObjs2 = @($csvRows)
+-                            } else {
+-                                try {
+-                                    $all = Get-Content -LiteralPath $selCsv
+-                                    if ($all -and $all.Count -gt 9) {
+-                                        $hdr = ConvertTo-CsvFields $all[7]
+-                                        $dl  = $all[9..($all.Count-1)] | Where-Object { $_ -and $_.Trim() }
+-                                        $del = Get-CsvDelimiter -Path $selCsv
+-                                        $csvObjs2 = @(ConvertFrom-Csv -InputObject ($dl -join "`n") -Delimiter $del -Header $hdr)
+-                                    }
+-                                } catch { $csvObjs2 = @() }
+-                            }
+-                        }
+-
+-                        if ($csvObjs2 -and $csvObjs2.Count -gt 0) {
+-                            $script:RuleEngineShadow = Invoke-RuleEngine -CsvObjects $csvObjs2 -RuleBank $rb2 -CsvPath $selCsv
++                        if ($script:RuleEngineShadowAttempted) {
++                            Gui-Log "⚠️ RuleEngine (shadow): saknas vid Save (redan försökt bygga tidigare) – hoppar över för att undvika dubbelkörning." 'Warn'
+                         } else {
+-                            Gui-Log "⚠️ RuleEngine (shadow): kunde inte bygga vid Save (0 rader)." 'Warn'
++                            Gui-Log "⚠️ RuleEngine (shadow): saknas vid Save (byggdes aldrig i körflödet) – hoppar över för att undvika dubbelkörning." 'Warn'
+                         }
+                     }
+ 

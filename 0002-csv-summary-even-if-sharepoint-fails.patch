@@ -1,0 +1,21 @@
+--- IPTCompile/zz_IPTCompile/Main.ps1
++++ IPTCompile/zz_IPTCompile/Main.ps1
+@@ -3241,9 +3241,15 @@
+                     if ($script:RuleEngineShadow -and $script:RuleEngineShadow.Rows -and $script:RuleEngineShadow.Rows.Count -gt 0) {
+                         Gui-Log "🧠 Skriver Sammanfattning av CSV..." 'Info'
+                         $includeAll = Get-ConfigFlag -Name 'RuleEngineDebugIncludeAllRows' -Default $false -ConfigOverride $Config
+-                        
+-
+-
++                        if (Get-Command Write-RuleEngineDebugSheet -ErrorAction SilentlyContinue) {
++                            try {
++                                Write-RuleEngineDebugSheet -Pkg $pkgOut -RuleEngineResult $script:RuleEngineShadow -IncludeAllRows:$includeAll
++                            } catch {
++                                Gui-Log ("⚠️ Kunde inte skapa 'CSV Sammanfattning': " + $_.Exception.Message) 'Warn'
++                            }
++                        } else {
++                            Gui-Log "⚠️ Write-RuleEngineDebugSheet saknas – kan inte skapa 'CSV Sammanfattning'." 'Warn'
++                        }
+ 
+                         # Om SharePoint Info skapades: bädda in den till höger i 'CSV Sammanfattning' och ta bort separat flik
+                         try {
